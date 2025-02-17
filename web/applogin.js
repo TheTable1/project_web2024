@@ -24,12 +24,10 @@ class App extends React.Component {
     this.state = {
       user: null,
       students: [],
-      stdId: "",
-      stdTitle: "",
-      stdFname: "",
-      stdLname: "",
-      stdEmail: "",
-      stdPhone: "",
+      subjects: [],
+      newSubject: "",
+      newSubjectCode: "",  // เพิ่มฟิลด์สำหรับ subjectCode
+      subjectToEdit: null,
     };
   }
 
@@ -42,6 +40,7 @@ class App extends React.Component {
       }
     });
 
+    // Load students
     db.collection("user")
       .get()
       .then((querySnapshot) => {
@@ -51,41 +50,99 @@ class App extends React.Component {
         });
         this.setState({ students });
       });
+
+    // Load subjects
+    db.collection("subjects")
+      .get()
+      .then((querySnapshot) => {
+        let subjects = [];
+        querySnapshot.forEach((doc) => {
+          subjects.push({ id: doc.id, ...doc.data() });
+        });
+        this.setState({ subjects });
+      });
   }
 
-  google_login = () => {
-    const provider = new firebase.auth.GoogleAuthProvider();
-    provider.addScope("profile");
-    provider.addScope("email");
-
-    auth
-      .signInWithPopup(provider)
-      .then((result) => {
-        const user = result.user;
-        if (user) {
-          this.setState({ user: user.toJSON() });
-
-          const userRef = db.collection("users").doc(user.uid);
-          userRef.get().then((doc) => {
-            if (!doc.exists) {
-              userRef.set({
-                name: user.displayName,
-                email: user.email,
-                photo: user.photoURL,
-                phone: "",
-                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-              });
-            }
-          });
-        }
-      })
-      .catch((error) => console.error("Login failed:", error));
+  handleSubjectChange = (event) => {
+    this.setState({ newSubject: event.target.value });
   };
 
-  google_logout = () => {
-    if (confirm("Are you sure?")) {
-      auth.signOut();
+  handleSubjectCodeChange = (event) => {
+    this.setState({ newSubjectCode: event.target.value });
+  };
+
+  addSubject = () => {
+    const { newSubject, newSubjectCode } = this.state;
+    if (newSubject.trim() === "" || newSubjectCode.trim() === "") {
+      alert("Please enter both subject name and subject code.");
+      return;
     }
+
+    db.collection("subjects")
+      .add({
+        name: newSubject,
+        code: newSubjectCode,  // บันทึก subjectCode ใน Firestore
+      })
+      .then(() => {
+        alert("Subject added successfully!");
+        this.setState({ newSubject: "", newSubjectCode: "" });
+        this.refreshSubjects();
+      })
+      .catch((error) => console.error("Error adding subject:", error));
+  };
+
+  editSubject = (subject) => {
+    this.setState({
+      subjectToEdit: subject,
+      newSubject: subject.name,
+      newSubjectCode: subject.code,  // กำหนดค่าให้กับฟิลด์ subjectCode เมื่อเลือกแก้ไข
+    });
+  };
+
+  updateSubject = () => {
+    const { subjectToEdit, newSubject, newSubjectCode } = this.state;
+    if (newSubject.trim() === "" || newSubjectCode.trim() === "") {
+      alert("Please enter both subject name and subject code.");
+      return;
+    }
+
+    db.collection("subjects")
+      .doc(subjectToEdit.id)
+      .update({
+        name: newSubject,
+        code: newSubjectCode,  // อัปเดต subjectCode ใน Firestore
+      })
+      .then(() => {
+        alert("Subject updated successfully!");
+        this.setState({ newSubject: "", newSubjectCode: "", subjectToEdit: null });
+        this.refreshSubjects();
+      })
+      .catch((error) => console.error("Error updating subject:", error));
+  };
+
+  deleteSubject = (subjectId) => {
+    if (window.confirm("Are you sure you want to delete this subject?")) {
+      db.collection("subjects")
+        .doc(subjectId)
+        .delete()
+        .then(() => {
+          alert("Subject deleted successfully!");
+          this.refreshSubjects();
+        })
+        .catch((error) => console.error("Error deleting subject:", error));
+    }
+  };
+
+  refreshSubjects = () => {
+    db.collection("subjects")
+      .get()
+      .then((querySnapshot) => {
+        let subjects = [];
+        querySnapshot.forEach((doc) => {
+          subjects.push({ id: doc.id, ...doc.data() });
+        });
+        this.setState({ subjects });
+      });
   };
 
   render() {
@@ -94,11 +151,81 @@ class App extends React.Component {
         <LoginBox user={this.state.user} app={this} />
         <Card.Body>
           <Info user={this.state.user} app={this} />
+          <div className="mt-4">
+            <h3>Manage Subjects</h3>
+            
+            <input
+              type="text"
+              value={this.state.newSubjectCode}
+              onChange={this.handleSubjectCodeChange}
+              placeholder="Enter subject code"
+            />
+            <input
+              type="text"
+              value={this.state.newSubject}
+              onChange={this.handleSubjectChange}
+              placeholder="Enter subject name"
+            />
+            <Button onClick={this.addSubject}>Add Subject</Button>
+            {this.state.subjectToEdit && (
+              <div>
+                <h4>Edit Subject</h4>
+                <input
+                  type="text"
+                  value={this.state.newSubject}
+                  onChange={this.handleSubjectChange}
+                />
+                <input
+                  type="text"
+                  value={this.state.newSubjectCode}
+                  onChange={this.handleSubjectCodeChange}
+                />
+                <Button onClick={this.updateSubject}>Update Subject</Button>
+              </div>
+            )}
+            <SubjectTable
+              subjects={this.state.subjects}
+              app={this}
+              onDelete={this.deleteSubject}
+              onEdit={this.editSubject}
+            />
+          </div>
         </Card.Body>
       </Card>
     );
   }
 }
+
+
+function SubjectTable({ subjects, app, onDelete, onEdit }) {
+  return (
+    <Table>
+      <thead>
+        <tr>
+        <th>Subject Code</th>
+          <th>Subject Name</th>
+           {/* เพิ่มคอลัมน์สำหรับแสดง subjectCode */}
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {subjects.map((subject) => (
+          <tr key={subject.id}>
+            <td>{subject.code}</td>
+            <td>{subject.name}</td>
+             {/* แสดง subjectCode */}
+            <td>
+              <Button onClick={() => onEdit(subject)}>Edit</Button>
+              <Button onClick={() => onDelete(subject.id)}>Delete</Button>
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </Table>
+  );
+}
+
+
 
 // ✅ Component: LoginBox
 function LoginBox({ user, app }) {
