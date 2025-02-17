@@ -1,4 +1,4 @@
-const { Alert, Card, Button, Table } = ReactBootstrap;
+const { Alert, Card, Button, Table, Form, Modal, Container, Row, Col } = ReactBootstrap;
 
 // Firebase Configuration
 const firebaseConfig = {
@@ -26,7 +26,7 @@ class App extends React.Component {
       students: [],
       subjects: [],
       newSubject: "",
-      newSubjectCode: "",  // เพิ่มฟิลด์สำหรับ subjectCode
+      newSubjectCode: "",
       subjectToEdit: null,
     };
   }
@@ -40,7 +40,11 @@ class App extends React.Component {
       }
     });
 
-    // Load students
+    this.loadStudents();
+    this.loadSubjects();
+  }
+
+  loadStudents = () => {
     db.collection("user")
       .get()
       .then((querySnapshot) => {
@@ -50,8 +54,9 @@ class App extends React.Component {
         });
         this.setState({ students });
       });
+  };
 
-    // Load subjects
+  loadSubjects = () => {
     db.collection("subjects")
       .get()
       .then((querySnapshot) => {
@@ -61,7 +66,7 @@ class App extends React.Component {
         });
         this.setState({ subjects });
       });
-  }
+  };
 
   handleSubjectChange = (event) => {
     this.setState({ newSubject: event.target.value });
@@ -81,7 +86,7 @@ class App extends React.Component {
     db.collection("subjects")
       .add({
         name: newSubject,
-        code: newSubjectCode,  // บันทึก subjectCode ใน Firestore
+        code: newSubjectCode,
       })
       .then(() => {
         alert("Subject added successfully!");
@@ -95,7 +100,7 @@ class App extends React.Component {
     this.setState({
       subjectToEdit: subject,
       newSubject: subject.name,
-      newSubjectCode: subject.code,  // กำหนดค่าให้กับฟิลด์ subjectCode เมื่อเลือกแก้ไข
+      newSubjectCode: subject.code,
     });
   };
 
@@ -110,7 +115,7 @@ class App extends React.Component {
       .doc(subjectToEdit.id)
       .update({
         name: newSubject,
-        code: newSubjectCode,  // อัปเดต subjectCode ใน Firestore
+        code: newSubjectCode,
       })
       .then(() => {
         alert("Subject updated successfully!");
@@ -145,60 +150,6 @@ class App extends React.Component {
       });
   };
 
-  render() {
-    return (
-      <Card>
-        <LoginBox user={this.state.user} app={this} />
-        <Card.Body>
-          <Info user={this.state.user} app={this} />
-          {this.state.user && (
-            <div className="mt-4">
-              <h3>Manage Subjects</h3>
-
-              <input
-                type="text"
-                value={this.state.newSubjectCode}
-                onChange={this.handleSubjectCodeChange}
-                placeholder="Enter subject code"
-              />
-              <input
-                type="text"
-                value={this.state.newSubject}
-                onChange={this.handleSubjectChange}
-                placeholder="Enter subject name"
-              />
-              <Button onClick={this.addSubject}>Add Subject</Button>
-
-              {this.state.subjectToEdit && (
-                <div>
-                  <h4>Edit Subject</h4>
-                  <input
-                    type="text"
-                    value={this.state.newSubject}
-                    onChange={this.handleSubjectChange}
-                  />
-                  <input
-                    type="text"
-                    value={this.state.newSubjectCode}
-                    onChange={this.handleSubjectCodeChange}
-                  />
-                  <Button onClick={this.updateSubject}>Update Subject</Button>
-                </div>
-              )}
-
-              <SubjectTable
-                subjects={this.state.subjects}
-                app={this}
-                onDelete={this.deleteSubject}
-                onEdit={this.editSubject}
-              />
-            </div>
-          )}
-        </Card.Body>
-      </Card>
-    );
-  }
-
   google_login = () => {
     const provider = new firebase.auth.GoogleAuthProvider();
     provider.addScope("profile");
@@ -219,7 +170,7 @@ class App extends React.Component {
                 email: user.email,
                 photo: user.photoURL,
                 phone: "",
-                room : [],
+                room: [],
                 createdAt: firebase.firestore.FieldValue.serverTimestamp(),
               });
             }
@@ -235,17 +186,82 @@ class App extends React.Component {
     }
   };
 
+  render() {
+    return (
+      <Container className="mt-4">
+        <Card className="shadow-sm">
+          <Card.Body>
+            <LoginBox user={this.state.user} app={this} />
+            <Info user={this.state.user} app={this} />
+
+            {this.state.user && (
+              <div className="mt-4">
+                <h3 className="text-primary mb-3">Manage Subjects</h3>
+
+                <Row className="mb-3">
+                  <Col md={4}>
+                    <Form.Control
+                      type="text"
+                      value={this.state.newSubjectCode}
+                      onChange={this.handleSubjectCodeChange}
+                      placeholder="Enter subject code"
+                      className="mb-2"
+                    />
+                  </Col>
+                  <Col md={4}>
+                    <Form.Control
+                      type="text"
+                      value={this.state.newSubject}
+                      onChange={this.handleSubjectChange}
+                      placeholder="Enter subject name"
+                      className="mb-2"
+                    />
+                  </Col>
+                  <Col md={4}>
+                    <Button variant="success" onClick={this.addSubject} className="w-100">
+                      Add Subject
+                    </Button>
+                  </Col>
+                </Row>
+
+                {this.state.subjectToEdit && (
+                  <div className="border p-3 rounded shadow-sm bg-light">
+                    <h4 className="text-warning">Edit Subject</h4>
+                    <Row className="mb-2">
+                      <Col>
+                        <Form.Control type="text" value={this.state.newSubject} onChange={this.handleSubjectChange} />
+                      </Col>
+                      <Col>
+                        <Form.Control type="text" value={this.state.newSubjectCode} onChange={this.handleSubjectCodeChange} />
+                      </Col>
+                      <Col>
+                        <Button variant="primary" onClick={this.updateSubject} className="w-100">
+                          Update Subject
+                        </Button>
+                      </Col>
+                    </Row>
+                  </div>
+                )}
+
+                <SubjectTable subjects={this.state.subjects} onDelete={this.deleteSubject} onEdit={this.editSubject} />
+              </div>
+            )}
+          </Card.Body>
+        </Card>
+      </Container>
+    );
+  }
 }
 
 
-function SubjectTable({ subjects, app, onDelete, onEdit }) {
+// Component: SubjectTable
+function SubjectTable({ subjects, onDelete, onEdit }) {
   return (
-    <Table>
-      <thead>
+    <Table striped bordered hover responsive className="mt-4">
+      <thead className="table-dark">
         <tr>
-        <th>Subject Code</th>
+          <th>Subject Code</th>
           <th>Subject Name</th>
-           {/* เพิ่มคอลัมน์สำหรับแสดง subjectCode */}
           <th>Actions</th>
         </tr>
       </thead>
@@ -254,10 +270,9 @@ function SubjectTable({ subjects, app, onDelete, onEdit }) {
           <tr key={subject.id}>
             <td>{subject.code}</td>
             <td>{subject.name}</td>
-             {/* แสดง subjectCode */}
             <td>
-              <Button onClick={() => onEdit(subject)}>Edit</Button>
-              <Button onClick={() => onDelete(subject.id)}>Delete</Button>
+              <Button variant="warning" size="sm" className="me-2" onClick={() => onEdit(subject)}>Edit</Button>
+              <Button variant="danger" size="sm" onClick={() => onDelete(subject.id)}>Delete</Button>
             </td>
           </tr>
         ))}
@@ -268,34 +283,33 @@ function SubjectTable({ subjects, app, onDelete, onEdit }) {
 
 
 
+
 // ✅ Component: LoginBox
 function LoginBox({ user, app }) {
   return user ? (
-    <div className="d-flex align-items-center bg-light p-3 rounded shadow-sm">
-      <img
-        src={user.photoURL}
-        alt="User Avatar"
-        className="rounded-circle border border-2 border-primary"
-        style={{ width: "50px", height: "50px", objectFit: "cover" }}
-      />
-      <span className="ms-3 fw-bold text-dark">{user.email}</span>
-      <Button
-        onClick={app.google_logout}
-        variant="danger"
-        className="ms-auto px-4 py-2"
-      >
-        Logout
-      </Button>
-    </div>
+    <Card className="p-4 shadow-sm bg-light text-center">
+      <div className="d-flex align-items-center justify-content-center">
+        <img
+          src={user.photoURL}
+          alt="User Avatar"
+          className="rounded-circle border border-3 border-primary"
+          style={{ width: "80px", height: "80px", objectFit: "cover" }}
+        />
+      </div>
+      <h4 className="mt-3 text-dark">{user.displayName}</h4>
+      <p className="text-muted">{user.email}</p>
+      <Button onClick={app.google_logout} variant="secondary" className="ms-auto px-4 py-2">
+  <i className="bi bi-box-arrow-right me-2" style={{ color: "gray" }}></i> Logout
+</Button>
+    </Card>
   ) : (
-    <div className="d-flex justify-content-center">
-      <Button
-        onClick={app.google_login}
-        variant="primary"
-        className="px-4 py-2 fw-bold shadow-sm"
-      >
-        Login
-      </Button>
+    <div className="d-flex vh-100 justify-content-center align-items-center" style={{ background: "#f8f9fa" }}>
+      <Card className="p-5 shadow-lg text-center">
+        <h2 className="mb-4 text-primary fw-bold">กรุณาเข้าสู่ระบบ</h2>
+        <Button variant="primary" onClick={app.google_login} className="px-4 py-2 fw-bold shadow-sm">
+          <i className="bi bi-google me-2"></i> Login with Google
+        </Button>
+      </Card>
     </div>
   );
 }
@@ -318,9 +332,9 @@ function Info({ user }) {
 
   return user ? (
     <div>
-      <h1>ยินดีต้อนรับ</h1>
-      <h2>{user.displayName}</h2>
-      <h3>{user.email}</h3>
+      <h4>ยินดีต้อนรับ</h4>
+      <h4>Name: {user.displayName}</h4>
+      <h4>Email: {user.email}</h4>
       <h4>Phone: {phone}</h4>
       <EditProfileButton user={user} />
       
@@ -354,42 +368,55 @@ function EditProfileButton({ user }) {
       })
       .then(() => {
         alert("Profile updated successfully!");
-
         setShowModal(false);
-
         window.location.reload();
       })
       .catch((error) => console.error("Error updating profile:", error));
   };
 
-
   return (
-    <div>
-      <Button onClick={() => setShowModal(true)}>Edit Profile</Button>
-      {showModal && (
-        <div className="modal-overlay">
-          <div className="modal-content">
-            <h3>Edit Profile</h3>
-            <label>Name:</label>
-            <input
-              type="text"
-              value={newName}
-              onChange={(e) => setNewName(e.target.value)}
-            />
-            <label>Phone:</label>
-            <input
-              type="text"
-              value={newPhone}
-              onChange={(e) => setNewPhone(e.target.value)}
-            />
-            <div className="modal-buttons">
-              <Button onClick={handleSave}>Save</Button>
-              <Button onClick={() => setShowModal(false)}>Cancel</Button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+    <>
+      <Button variant="warning" className="mt-2" onClick={() => setShowModal(true)}>
+        <i className="bi bi-pencil-square me-2"></i> Edit Profile
+      </Button>
+
+      {/* Bootstrap Modal */}
+      <Modal show={showModal} onHide={() => setShowModal(false)} centered>
+        <Modal.Header closeButton>
+          <Modal.Title>Edit Profile</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <Form>
+            <Form.Group className="mb-3">
+              <Form.Label>Name:</Form.Label>
+              <Form.Control
+                type="text"
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                placeholder="Enter your name"
+              />
+            </Form.Group>
+            <Form.Group className="mb-3">
+              <Form.Label>Phone:</Form.Label>
+              <Form.Control
+                type="text"
+                value={newPhone}
+                onChange={(e) => setNewPhone(e.target.value)}
+                placeholder="Enter your phone number"
+              />
+            </Form.Group>
+          </Form>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowModal(false)}>
+            Cancel
+          </Button>
+          <Button variant="success" onClick={handleSave}>
+            Save Changes
+          </Button>
+        </Modal.Footer>
+      </Modal>
+    </>
   );
 }
 
@@ -401,3 +428,4 @@ root.render(
     <App />
   </React.StrictMode>
 );
+
