@@ -18,22 +18,23 @@ function LoginApp() {
     firebase.initializeApp(firebaseConfig);
   }
 
-  const auth = firebase.auth();
+  let auth = firebase.auth();
   const provider = new firebase.auth.GoogleAuthProvider();
 
   React.useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((user) => {
       if (user) {
         setUser(user);
-      } else {
-        setUser(null);
+        window.location.href = "dashboard.html"; // เปลี่ยนเส้นทางเมื่อเข้าสู่ระบบ
       }
     });
-    return () => unsubscribe();
+
+    return () => unsubscribe(); // Cleanup listener
   }, []);
 
   const handleGoogleLogin = () => {
-    auth.signInWithPopup(provider)
+    auth
+      .signInWithPopup(provider)
       .then((result) => {
         console.log("Logged in as:", result.user.displayName);
       })
@@ -42,42 +43,23 @@ function LoginApp() {
       });
   };
 
-  const handleSignOut = () => {
-    auth.signOut()
-      .then(() => {
-        setUser(null);
-        alert("Signed out successfully!");
-        window.location.href = "index.html";
-      })
-      .catch((error) => {
-        console.error("Sign out error", error);
-      });
-  };
+  google_logout(){
+    if(confirm("Are you sure?")){
+      firebase.auth().signOut();
+    }
+}
 
   return (
     <div className="login-container">
-      {user ? (
-        <div>
-          <h3 className="fw-bold">Welcome, {user.displayName}</h3>
-          <button className="logout-button mt-3" onClick={handleSignOut}>
-            Sign Out
-          </button>
-        </div>
-      ) : (
-        <div>
-          <h3 className="fw-bold">Sign in</h3>
-          <button className="login-button mt-3" onClick={handleGoogleLogin}>
-            Sign in with Google
-          </button>
-        </div>
-      )}
+      <h3 className="fw-bold">Sign in</h3>
+      <button className="login-button mt-3" onClick={handleGoogleLogin}>
+        Sign in with Google
+      </button>
     </div>
   );
 }
 
 // Render React Component ด้วย React 18
 const container = document.getElementById("root");
-if (container) {
-  const root = ReactDOM.createRoot(container);
-  root.render(<LoginApp />);
-}
+const root = ReactDOM.createRoot(container);
+root.render(<LoginApp />);
