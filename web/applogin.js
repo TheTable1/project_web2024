@@ -91,20 +91,10 @@ class App extends React.Component {
   render() {
     return (
       <Card>
-        <Card.Header>
-          <Alert variant="info">
-            <b>Student Check-In System</b>
-          </Alert>
-        </Card.Header>
         <LoginBox user={this.state.user} app={this} />
         <Card.Body>
           <Info user={this.state.user} app={this} />
         </Card.Body>
-        <Card.Footer>
-          By 653380201-2 ธนวัฒน์ ถนัดค้า
-          <br />
-          College of Computing, Khon Kaen University
-        </Card.Footer>
       </Card>
     );
   }
@@ -184,7 +174,7 @@ function EditProfileButton({ user }) {
         alert("Profile updated successfully!");
 
         setShowModal(false);
-        
+
         window.location.reload();
       })
       .catch((error) => console.error("Error updating profile:", error));
