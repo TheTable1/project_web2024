@@ -151,45 +151,49 @@ class App extends React.Component {
         <LoginBox user={this.state.user} app={this} />
         <Card.Body>
           <Info user={this.state.user} app={this} />
-          <div className="mt-4">
-            <h3>Manage Subjects</h3>
-            
-            <input
-              type="text"
-              value={this.state.newSubjectCode}
-              onChange={this.handleSubjectCodeChange}
-              placeholder="Enter subject code"
-            />
-            <input
-              type="text"
-              value={this.state.newSubject}
-              onChange={this.handleSubjectChange}
-              placeholder="Enter subject name"
-            />
-            <Button onClick={this.addSubject}>Add Subject</Button>
-            {this.state.subjectToEdit && (
-              <div>
-                <h4>Edit Subject</h4>
-                <input
-                  type="text"
-                  value={this.state.newSubject}
-                  onChange={this.handleSubjectChange}
-                />
-                <input
-                  type="text"
-                  value={this.state.newSubjectCode}
-                  onChange={this.handleSubjectCodeChange}
-                />
-                <Button onClick={this.updateSubject}>Update Subject</Button>
-              </div>
-            )}
-            <SubjectTable
-              subjects={this.state.subjects}
-              app={this}
-              onDelete={this.deleteSubject}
-              onEdit={this.editSubject}
-            />
-          </div>
+          {this.state.user && (
+            <div className="mt-4">
+              <h3>Manage Subjects</h3>
+
+              <input
+                type="text"
+                value={this.state.newSubjectCode}
+                onChange={this.handleSubjectCodeChange}
+                placeholder="Enter subject code"
+              />
+              <input
+                type="text"
+                value={this.state.newSubject}
+                onChange={this.handleSubjectChange}
+                placeholder="Enter subject name"
+              />
+              <Button onClick={this.addSubject}>Add Subject</Button>
+
+              {this.state.subjectToEdit && (
+                <div>
+                  <h4>Edit Subject</h4>
+                  <input
+                    type="text"
+                    value={this.state.newSubject}
+                    onChange={this.handleSubjectChange}
+                  />
+                  <input
+                    type="text"
+                    value={this.state.newSubjectCode}
+                    onChange={this.handleSubjectCodeChange}
+                  />
+                  <Button onClick={this.updateSubject}>Update Subject</Button>
+                </div>
+              )}
+
+              <SubjectTable
+                subjects={this.state.subjects}
+                app={this}
+                onDelete={this.deleteSubject}
+                onEdit={this.editSubject}
+              />
+            </div>
+          )}
         </Card.Body>
       </Card>
     );
@@ -319,6 +323,7 @@ function Info({ user }) {
       <h3>{user.email}</h3>
       <h4>Phone: {phone}</h4>
       <EditProfileButton user={user} />
+      
     </div>
   ) : (
     <h1>กรุณาเข้าสู่ระบบ</h1>
