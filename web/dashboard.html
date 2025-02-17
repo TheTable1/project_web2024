@@ -8,45 +8,44 @@
     <!-- Bootstrap -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
 
+    <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
 
     <script>
-        const firebaseConfig = {
-            apiKey: "AIzaSyDpyi2...",
-            authDomain: "projectweb-150fc.firebaseapp.com",
-            projectId: "projectweb-150fc",
-            storageBucket: "projectweb-150fc.appspot.com",
-            messagingSenderId: "148917915697",
-            appId: "1:148917915697:web:7465133260f2d80e320510",
-            measurementId: "G-Y03E7R1JSC",
-        };
+        document.addEventListener("DOMContentLoaded", function () {
+            // ✅ Firebase Config
+            const firebaseConfig = {
+                apiKey: "AIzaSyDpyi2...",
+                authDomain: "projectweb-150fc.firebaseapp.com",
+                projectId: "projectweb-150fc",
+                storageBucket: "projectweb-150fc.appspot.com",
+                messagingSenderId: "148917915697",
+                appId: "1:148917915697:web:7465133260f2d80e320510",
+                measurementId: "G-Y03E7R1JSC",
+            };
 
-        firebase.initializeApp(firebaseConfig);
-        const auth = firebase.auth();
-
-        function signOut() {
-            auth.signOut().then(() => {
-                window.location.href = "login.html"; // กลับไปหน้า Login
+            // ✅ Initialize Firebase (ป้องกันการ Initializing ซ้ำ)
+            if (!firebase.apps.length) {
+                firebase.initializeApp(firebaseConfig);
+            }
+        
+            // ✅ ฟังก์ชัน Logout
+            document.getElementById("sign-out-btn").addEventListener("click", function () {
+                auth.signOut().then(() => {
+                    window.location.href = "/login.html"; // 🔹 กลับไปหน้า Login
+                }).catch((error) => {
+                    console.error("Error signing out:", error);
+                });
             });
-        }
-
-        window.onload = function () {
-            auth.onAuthStateChanged((user) => {
-                if (user) {
-                    document.getElementById("user-name").textContent = user.displayName;
-                } else {
-                    window.location.href = "login.html"; // ถ้ายังไม่ได้ล็อกอิน กลับไปหน้า login
-                }
-            });
-        };
+        });
     </script>
 
 </head>
 <body class="text-center">
     <div class="container mt-5">
         <h2>Welcome, <span id="user-name">User</span>!</h2>
-        <button class="btn btn-danger mt-3" onclick="signOut()">Sign Out</button>
+        <button id="sign-out-btn" class="btn btn-danger mt-3">Sign Out</button>
     </div>
 </body>
 </html>
