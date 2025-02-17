@@ -42,6 +42,17 @@ class App extends React.Component {
         stdPhone: "",
     }  
 
+    constructor(){
+      super();
+      auth.onAuthStateChanged((user)=>{
+          if (user) {
+            this.setState({user:user.toJSON()});
+          }else{
+            this.setState({user:null});
+         }
+      });    
+  }
+
     google_login() {
         // Using a popup.
         var provider = new firebase.auth.GoogleAuthProvider();
@@ -63,6 +74,7 @@ class App extends React.Component {
             <Card.Header>{this.title}</Card.Header>  
             <LoginBox user={this.state.user} app={this}></LoginBox>
             <Card.Body>
+            <Editinfo app={this}></Editinfo>
               
       
             </Card.Body>
@@ -129,6 +141,18 @@ function StudentTable({ data, app }){
             <img src={u.photoURL} />
             {u.email}<Button onClick={() => app.google_logout()}>Logout</Button></div>
     }
+  }
+
+  function Editinfo(app){
+    return <div>
+      <TextInput label="รหัส" app={app} value="stdId"/>
+      <TextInput label="คำนำหน้า" app={app} value="stdTitle"/>
+      <TextInput label="ชื่อ" app={app} value="stdFname"/>
+      <TextInput label="สกุล" app={app} value="stdLname"/>
+      <TextInput label="email" app={app} value="stdEmail"/>
+      <TextInput label="เบอร์โทร" app={app} value="stdPhone"/>
+      <Button onClick={()=>app.save()}>บันทึก</Button>
+    </div>;
   }
 
 const container = document.getElementById("myapp");
