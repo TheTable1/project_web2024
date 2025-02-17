@@ -25,16 +25,15 @@ function LoginApp() {
     const unsubscribe = auth.onAuthStateChanged((user) => {
       if (user) {
         setUser(user);
-        window.location.href = "dashboard.html"; // เปลี่ยนเส้นทางเมื่อเข้าสู่ระบบ
+      } else {
+        setUser(null);
       }
     });
-
-    return () => unsubscribe(); // Cleanup listener
+    return () => unsubscribe();
   }, []);
 
   const handleGoogleLogin = () => {
-    auth
-      .signInWithPopup(provider)
+    auth.signInWithPopup(provider)
       .then((result) => {
         console.log("Logged in as:", result.user.displayName);
       })
@@ -43,17 +42,42 @@ function LoginApp() {
       });
   };
 
+  const handleSignOut = () => {
+    auth.signOut()
+      .then(() => {
+        setUser(null);
+        alert("Signed out successfully!");
+        window.location.href = "index.html";
+      })
+      .catch((error) => {
+        console.error("Sign out error", error);
+      });
+  };
+
   return (
     <div className="login-container">
-      <h3 className="fw-bold">Sign in</h3>
-      <button className="login-button mt-3" onClick={handleGoogleLogin}>
-        Sign in with Google
-      </button>
+      {user ? (
+        <div>
+          <h3 className="fw-bold">Welcome, {user.displayName}</h3>
+          <button className="logout-button mt-3" onClick={handleSignOut}>
+            Sign Out
+          </button>
+        </div>
+      ) : (
+        <div>
+          <h3 className="fw-bold">Sign in</h3>
+          <button className="login-button mt-3" onClick={handleGoogleLogin}>
+            Sign in with Google
+          </button>
+        </div>
+      )}
     </div>
   );
 }
 
 // Render React Component ด้วย React 18
 const container = document.getElementById("root");
-const root = ReactDOM.createRoot(container);
-root.render(<LoginApp />);
+if (container) {
+  const root = ReactDOM.createRoot(container);
+  root.render(<LoginApp />);
+}
