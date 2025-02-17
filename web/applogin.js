@@ -152,48 +152,50 @@ class App extends React.Component {
         <Card.Body>
           <Info user={this.state.user} app={this} />
           {this.state.user && (
-            <div className="mt-4">
-              <h3>Manage Subjects</h3>
+  <div className="mt-4">
+    <h3>Manage Subjects</h3>
 
-              <input
-                type="text"
-                value={this.state.newSubjectCode}
-                onChange={this.handleSubjectCodeChange}
-                placeholder="Enter subject code"
-              />
-              <input
-                type="text"
-                value={this.state.newSubject}
-                onChange={this.handleSubjectChange}
-                placeholder="Enter subject name"
-              />
-              <Button onClick={this.addSubject}>Add Subject</Button>
+    <input
+      type="text"
+      value={this.state.newSubjectCode}
+      onChange={this.handleSubjectCodeChange}
+      placeholder="Enter subject code"
+    />
+    <input
+      type="text"
+      value={this.state.newSubject}
+      onChange={this.handleSubjectChange}
+      placeholder="Enter subject name"
+    />
+    <Button onClick={this.addSubject}>Add Subject</Button>
 
-              {this.state.subjectToEdit && (
-                <div>
-                  <h4>Edit Subject</h4>
-                  <input
-                    type="text"
-                    value={this.state.newSubject}
-                    onChange={this.handleSubjectChange}
-                  />
-                  <input
-                    type="text"
-                    value={this.state.newSubjectCode}
-                    onChange={this.handleSubjectCodeChange}
-                  />
-                  <Button onClick={this.updateSubject}>Update Subject</Button>
-                </div>
-              )}
+    {this.state.subjectToEdit && (
+      <div>
+        <h4>Edit Subject</h4>
+        <input
+          type="text"
+          value={this.state.newSubjectCode}
+          onChange={this.handleSubjectCodeChange}
+        />
+        <input
+          type="text"
+          value={this.state.newSubject}
+          onChange={this.handleSubjectChange}
+        />
+        
+        <Button onClick={this.updateSubject}>Update Subject</Button>
+      </div>
+    )}
 
-              <SubjectTable
-                subjects={this.state.subjects}
-                app={this}
-                onDelete={this.deleteSubject}
-                onEdit={this.editSubject}
-              />
-            </div>
-          )}
+    <SubjectTable
+      subjects={this.state.subjects}
+      app={this}
+      onDelete={this.deleteSubject}
+      onEdit={this.editSubject}
+    />
+  </div>
+)}
+
         </Card.Body>
       </Card>
     );
