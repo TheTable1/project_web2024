@@ -194,6 +194,43 @@ class App extends React.Component {
       </Card>
     );
   }
+
+  google_login = () => {
+    const provider = new firebase.auth.GoogleAuthProvider();
+    provider.addScope("profile");
+    provider.addScope("email");
+
+    auth
+      .signInWithPopup(provider)
+      .then((result) => {
+        const user = result.user;
+        if (user) {
+          this.setState({ user: user.toJSON() });
+
+          const userRef = db.collection("users").doc(user.uid);
+          userRef.get().then((doc) => {
+            if (!doc.exists) {
+              userRef.set({
+                name: user.displayName,
+                email: user.email,
+                photo: user.photoURL,
+                phone: "",
+                room : [],
+                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+              });
+            }
+          });
+        }
+      })
+      .catch((error) => console.error("Login failed:", error));
+  };
+
+  google_logout = () => {
+    if (confirm("Are you sure?")) {
+      auth.signOut();
+    }
+  };
+
 }
 
 
