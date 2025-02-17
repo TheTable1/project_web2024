@@ -103,22 +103,35 @@ class App extends React.Component {
 // ✅ Component: LoginBox
 function LoginBox({ user, app }) {
   return user ? (
-    <div className="d-flex align-items-center">
+    <div className="d-flex align-items-center bg-light p-3 rounded shadow-sm">
       <img
         src={user.photoURL}
         alt="User Avatar"
-        className="rounded-circle me-3"
-        style={{ width: "50px", height: "50px" }}
+        className="rounded-circle border border-2 border-primary"
+        style={{ width: "50px", height: "50px", objectFit: "cover" }}
       />
-      <span className="me-3">{user.email}</span>
-      <Button onClick={app.google_logout} variant="danger" className="ms-2">
+      <span className="ms-3 fw-bold text-dark">{user.email}</span>
+      <Button
+        onClick={app.google_logout}
+        variant="danger"
+        className="ms-auto px-4 py-2"
+      >
         Logout
       </Button>
     </div>
   ) : (
-    <Button onClick={app.google_login}>Login</Button>
+    <div className="d-flex justify-content-center">
+      <Button
+        onClick={app.google_login}
+        variant="primary"
+        className="px-4 py-2 fw-bold shadow-sm"
+      >
+        Login
+      </Button>
+    </div>
   );
 }
+
 
 // ✅ Component: Info
 function Info({ user }) {
