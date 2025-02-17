@@ -42,8 +42,9 @@ class App extends React.Component {
         stdPhone: "",
     }  
 
-    constructor(){
-      super();
+    constructor(props){
+      super(props);
+      
       auth.onAuthStateChanged((user)=>{
           if (user) {
             this.setState({user:user.toJSON()});
@@ -58,7 +59,33 @@ class App extends React.Component {
         var provider = new firebase.auth.GoogleAuthProvider();
         provider.addScope("profile");
         provider.addScope("email");
-        firebase.auth().signInWithPopup(provider);
+
+        firebase.auth().signInWithPopup(provider).then((result) => {
+          const user = result.user;
+          if (user) {
+              this.setState({ user: user.toJSON() });
+  
+              // Save user data to Firestore
+              const userRef = db.collection("users").doc(user.uid);
+              userRef.get().then((doc) => {
+                  if (!doc.exists) {
+                      userRef.set({
+                          name: user.displayName,
+                          email: user.email,
+                          photo: user.photoURL,
+                          phone: "", // Empty initially
+                          createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                      }).then(() => {
+                          console.log("User data added to Firestore.");
+                      }).catch((error) => {
+                          console.error("Error adding user:", error);
+                      });
+                  }
+              });
+          }
+      }).catch((error) => {
+          console.error("Login failed:", error);
+      });
     }
 
     google_logout() {
@@ -74,9 +101,7 @@ class App extends React.Component {
             <Card.Header>{this.title}</Card.Header>  
             <LoginBox user={this.state.user} app={this}></LoginBox>
             <Card.Body>
-            <Editinfo app={this}></Editinfo>
-              
-      
+            <Info user={this.state.user} app={this}></Info>  
             </Card.Body>
             <Card.Footer>{this.footer}</Card.Footer>
           </Card>          
@@ -137,23 +162,131 @@ function StudentTable({ data, app }){
     if (!u) {
         return <div><Button onClick={() => app.google_login()}>Login</Button></div>
     } else {
-        return <div>
-            <img src={u.photoURL} />
-            {u.email}<Button onClick={() => app.google_logout()}>Logout</Button></div>
+        return <div className="d-flex align-items-center">
+        {/* รูปโปรไฟล์ผู้ใช้ */}
+        <img 
+            src={u.photoURL} 
+            alt="User Avatar" 
+            className="rounded-circle me-3" 
+            style={{ width: '50px', height: '50px' }} 
+        />
+        
+        {/* ข้อมูลอีเมล */}
+        <span className="me-3">{u.email}</span>
+    
+        {/* ปุ่ม Logout */}
+        <Button 
+            onClick={() => app.google_logout()} 
+            variant="danger" 
+            className="ms-2"
+        >
+            Logout
+        </Button>
+    </div>
     }
   }
 
-  function Editinfo(app){
-    return <div>
-      <TextInput label="รหัส" app={app} value="stdId"/>
-      <TextInput label="คำนำหน้า" app={app} value="stdTitle"/>
-      <TextInput label="ชื่อ" app={app} value="stdFname"/>
-      <TextInput label="สกุล" app={app} value="stdLname"/>
-      <TextInput label="email" app={app} value="stdEmail"/>
-      <TextInput label="เบอร์โทร" app={app} value="stdPhone"/>
-      <Button onClick={()=>app.save()}>บันทึก</Button>
-    </div>;
+  function Info(props) {
+    const { user, app } = props;
+    const [phone, setPhone] = React.useState("");
+  
+    React.useEffect(() => {
+      if (user) {
+        const userRef = db.collection("users").doc(user.uid);
+        userRef.get().then((doc) => {
+          if (doc.exists) {
+            setPhone(doc.data().phone || "Not set");
+          }
+        });
+      }
+    }, [user]);
+  
+    if (!user) {
+      return <div><h1>กรุณาเข้าสู่ระบบ</h1></div>;
+    } else {
+      return (
+        <div>
+          <h1>ยินดีต้อนรับ</h1>
+          <h2>{user.displayName}</h2>
+          <h3>{user.email}</h3>
+          <h4>Phone: {phone}</h4>
+          <EditProfileButton user={user} />
+        </div>
+      );
+    }
   }
+
+  function EditProfileButton({ user, app }) {
+    const [showModal, setShowModal] = React.useState(false);
+    const [newName, setNewName] = React.useState(user.displayName);
+    const [newPhone, setNewPhone] = React.useState("");
+
+    // Fetch user data from Firestore
+    React.useEffect(() => {
+        const userRef = db.collection("users").doc(user.uid);
+        userRef.get().then((doc) => {
+            if (doc.exists) {
+                setNewPhone(doc.data().phone || "");
+            }
+        });
+    }, [user]);
+
+    const handleSave = () => {
+      const { user, newPhone, newName } = this.state;
+        const userRef = db.collection("users").doc(user.uid);
+        
+        userRef.update({
+            name: newName,
+            phone: newPhone,
+        }).then(() => {
+            alert("Profile updated successfully!");
+            setShowModal(false);
+
+            // Update app state with new data
+            app.setState({
+                user: {
+                    ...app.state.user,
+                    displayName: newName,
+                },
+            });
+        }).catch((error) => {
+            console.error("Error updating profile:", error);
+        });
+    };
+
+    return (
+        <div>
+            <Button onClick={() => setShowModal(true)}>Edit Profile</Button>
+
+            {showModal && (
+                <div className="modal-overlay">
+                    <div className="modal-content">
+                        <h3>Edit Profile</h3>
+                        <label>Name:</label>
+                        <input
+                            type="text"
+                            value={newName}
+                            onChange={(e) => setNewName(e.target.value)}
+                        />
+
+                        <label>Phone:</label>
+                        <input
+                            type="text"
+                            value={newPhone}
+                            onChange={(e) => setNewPhone(e.target.value)}
+                        />
+
+                        <div className="modal-buttons">
+                            <Button onClick={handleSave}>Save</Button>
+                            <Button onClick={() => setShowModal(false)}>Cancel</Button>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
+
 
 const container = document.getElementById("myapp");
 const root = ReactDOM.createRoot(container);
