@@ -18,7 +18,7 @@ function LoginApp() {
     firebase.initializeApp(firebaseConfig);
   }
 
-  const auth = firebase.auth();
+  let auth = firebase.auth();
   const provider = new firebase.auth.GoogleAuthProvider();
 
   React.useEffect(() => {
@@ -42,6 +42,12 @@ function LoginApp() {
         console.error("Login failed:", error);
       });
   };
+
+  google_logout(){
+    if(confirm("Are you sure?")){
+      firebase.auth().signOut();
+    }
+}
 
   return (
     <div className="login-container">
