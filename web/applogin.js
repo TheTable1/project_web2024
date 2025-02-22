@@ -394,14 +394,8 @@ function LoginBox({ user, app }) {
   );
 }
 
-<<<<<<< Updated upstream
-// Component: Info
-function Info({ user }) {
-=======
-
 // ✅ Component: Info
 function Info({ user ,toggleSubjects }) {
->>>>>>> Stashed changes
   const [phone, setPhone] = React.useState("");
 
   React.useEffect(() => {
