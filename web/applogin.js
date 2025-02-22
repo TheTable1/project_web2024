@@ -1,4 +1,5 @@
-const { Alert, Card, Button, Table, Form, Modal, Container, Row, Col } = ReactBootstrap;
+const { Alert, Card, Button, Table, Form, Modal, Container, Row, Col } =
+  ReactBootstrap;
 
 // Firebase Configuration
 const firebaseConfig = {
@@ -60,16 +61,17 @@ class App extends React.Component {
     const { user } = this.state;
     if (!user) return;
 
-    // ดึงข้อมูลวิชาจาก Firestore
-    db.collection("subjects")
-      .where("userId", "==", user.uid) // ใช้ userId เพื่อดึงข้อมูลของผู้ใช้แต่ละคน
+    // ดึงข้อมูลวิชาจาก path /users/{user.uid}/classroom
+    db.collection("users")
+      .doc(user.uid)
+      .collection("classroom")
       .get()
       .then((querySnapshot) => {
         let subjects = [];
         querySnapshot.forEach((doc) => {
           subjects.push({ id: doc.id, ...doc.data() });
         });
-        this.setState({ subjects }); // อัพเดต state subjects ด้วยข้อมูลที่ดึงมา
+        this.setState({ subjects });
       })
       .catch((error) => console.error("Error fetching subjects:", error));
   };
@@ -89,11 +91,13 @@ class App extends React.Component {
       return;
     }
 
-    db.collection("subjects")
+    // เพิ่มรายวิชาไปที่ path /users/{user.uid}/classroom
+    db.collection("users")
+      .doc(user.uid)
+      .collection("classroom")
       .add({
         name: newSubject,
         code: newSubjectCode,
-        userId: user.uid, // ผูกกับ user ที่เพิ่มวิชานี้
       })
       .then(() => {
         alert("Subject added successfully!");
@@ -112,13 +116,16 @@ class App extends React.Component {
   };
 
   updateSubject = () => {
-    const { subjectToEdit, newSubject, newSubjectCode } = this.state;
+    const { subjectToEdit, newSubject, newSubjectCode, user } = this.state;
     if (newSubject.trim() === "" || newSubjectCode.trim() === "") {
       alert("Please enter both subject name and subject code.");
       return;
     }
 
-    db.collection("subjects")
+    // แก้ไขข้อมูลใน path /users/{user.uid}/classroom/{subjectId}
+    db.collection("users")
+      .doc(user.uid)
+      .collection("classroom")
       .doc(subjectToEdit.id)
       .update({
         name: newSubject,
@@ -138,19 +145,28 @@ class App extends React.Component {
 
   deleteSubject = (subjectId) => {
     if (window.confirm("Are you sure you want to delete this subject?")) {
-      db.collection("subjects")
+      const { user } = this.state;
+      // ลบรายวิชาจาก path /users/{user.uid}/classroom/{subjectId}
+      db.collection("users")
+        .doc(user.uid)
+        .collection("classroom")
         .doc(subjectId)
         .delete()
         .then(() => {
           alert("Subject deleted successfully!");
-          this.loadSubjects(); // เรียกใช้ loadSubjects เพื่อโหลดข้อมูลวิชาใหม่
+          this.loadSubjects(); // โหลดข้อมูลวิชาใหม่หลังจากลบ
         })
         .catch((error) => console.error("Error deleting subject:", error));
     }
   };
 
+  // (หากต้องการใช้งาน refreshSubjects ก็ควรเปลี่ยน path ด้วย)
   refreshSubjects = () => {
-    db.collection("subjects")
+    const { user } = this.state;
+    if (!user) return;
+    db.collection("users")
+      .doc(user.uid)
+      .collection("classroom")
       .get()
       .then((querySnapshot) => {
         let subjects = [];
@@ -246,17 +262,18 @@ class App extends React.Component {
                       <Col>
                         <Form.Control
                           type="text"
-                          value={this.state.newSubject}
-                          onChange={this.handleSubjectChange}
+                          value={this.state.newSubjectCode}
+                          onChange={this.handleSubjectCodeChange}
                         />
                       </Col>
                       <Col>
                         <Form.Control
                           type="text"
-                          value={this.state.newSubjectCode}
-                          onChange={this.handleSubjectCodeChange}
+                          value={this.state.newSubject}
+                          onChange={this.handleSubjectChange}
                         />
                       </Col>
+                      
                       <Col>
                         <Button
                           variant="primary"
@@ -284,7 +301,6 @@ class App extends React.Component {
   }
 }
 
-
 // Component: SubjectTable
 function SubjectTable({ subjects, onDelete, onEdit }) {
   return (
@@ -302,8 +318,21 @@ function SubjectTable({ subjects, onDelete, onEdit }) {
             <td>{subject.code}</td>
             <td>{subject.name}</td>
             <td>
-              <Button variant="warning" size="sm" className="me-2" onClick={() => onEdit(subject)}>Edit</Button>
-              <Button variant="danger" size="sm" onClick={() => onDelete(subject.id)}>Delete</Button>
+              <Button
+                variant="warning"
+                size="sm"
+                className="me-2"
+                onClick={() => onEdit(subject)}
+              >
+                Edit
+              </Button>
+              <Button
+                variant="danger"
+                size="sm"
+                onClick={() => onDelete(subject.id)}
+              >
+                Delete
+              </Button>
             </td>
           </tr>
         ))}
@@ -312,10 +341,7 @@ function SubjectTable({ subjects, onDelete, onEdit }) {
   );
 }
 
-
-
-
-// ✅ Component: LoginBox
+// Component: LoginBox
 function LoginBox({ user, app }) {
   return user ? (
     <Card className="p-4 shadow-sm bg-light text-center">
@@ -329,15 +355,27 @@ function LoginBox({ user, app }) {
       </div>
       <h4 className="mt-3 text-dark">{user.displayName}</h4>
       <p className="text-muted">{user.email}</p>
-      <Button onClick={app.google_logout} variant="secondary" className="ms-auto px-4 py-2">
-  <i className="bi bi-box-arrow-right me-2" style={{ color: "gray" }}></i> Logout
-</Button>
+      <Button
+        onClick={app.google_logout}
+        variant="secondary"
+        className="ms-auto px-4 py-2"
+      >
+        <i className="bi bi-box-arrow-right me-2" style={{ color: "gray" }}></i>{" "}
+        Logout
+      </Button>
     </Card>
   ) : (
-    <div className="d-flex vh-100 justify-content-center align-items-center" style={{ background: "#f8f9fa" }}>
+    <div
+      className="d-flex vh-100 justify-content-center align-items-center"
+      style={{ background: "#f8f9fa" }}
+    >
       <Card className="p-5 shadow-lg text-center">
         <h2 className="mb-4 text-primary fw-bold">กรุณาเข้าสู่ระบบ</h2>
-        <Button variant="primary" onClick={app.google_login} className="px-4 py-2 fw-bold shadow-sm">
+        <Button
+          variant="primary"
+          onClick={app.google_login}
+          className="px-4 py-2 fw-bold shadow-sm"
+        >
           <i className="bi bi-google me-2"></i> Login with Google
         </Button>
       </Card>
@@ -345,8 +383,7 @@ function LoginBox({ user, app }) {
   );
 }
 
-
-// ✅ Component: Info
+// Component: Info
 function Info({ user }) {
   const [phone, setPhone] = React.useState("");
 
@@ -368,14 +405,13 @@ function Info({ user }) {
       <h4>Email: {user.email}</h4>
       <h4>Phone: {phone}</h4>
       <EditProfileButton user={user} />
-      
     </div>
   ) : (
     <h1></h1>
   );
 }
 
-// ✅ Component: EditProfileButton
+// Component: EditProfileButton
 function EditProfileButton({ user }) {
   const [showModal, setShowModal] = React.useState(false);
   const [newName, setNewName] = React.useState(user.displayName || "");
@@ -407,7 +443,11 @@ function EditProfileButton({ user }) {
 
   return (
     <>
-      <Button variant="warning" className="mt-2" onClick={() => setShowModal(true)}>
+      <Button
+        variant="warning"
+        className="mt-2"
+        onClick={() => setShowModal(true)}
+      >
         <i className="bi bi-pencil-square me-2"></i> Edit Profile
       </Button>
 
@@ -451,7 +491,7 @@ function EditProfileButton({ user }) {
   );
 }
 
-// ✅ Render App in React 18+
+// Render App in React 18+
 const container = document.getElementById("myapp");
 const root = ReactDOM.createRoot(container);
 root.render(
@@ -459,4 +499,3 @@ root.render(
     <App />
   </React.StrictMode>
 );
-
