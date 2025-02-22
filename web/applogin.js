@@ -202,7 +202,6 @@ class App extends React.Component {
             <Button variant="success" className="mt-2" onClick={this.toggleSubjects}><i className="bi bi-pencil-square me-2">
         </i> View Classroom
       </Button>
-            <Info user={this.state.user} app={this} />
             {this.state.user && this.state.showSubjects && (
               <div className="mt-4">
                 <h3 className="text-primary mb-3">Manage Subjects</h3>
@@ -426,29 +425,6 @@ function LoginBox({ user, app }) {
       </Button>
     </Card>
   );
-}
-
-// Component: Info (สำหรับแสดงข้อมูลเพิ่มเติม หากต้องการ)
-function Info({ user }) {
-  const [name, setName] = React.useState("");
-  const [email, setEmail] = React.useState("");
-  const [phone, setPhone] = React.useState("");
-
-  React.useEffect(() => {
-    if (user) {
-      const userRef = db.collection("users").doc(user.uid);
-      userRef.get().then((doc) => {
-        if (doc.exists) {
-          const data = doc.data();
-          setName(data.name || "");
-          setEmail(data.email || "");
-          setPhone(data.phone || "");
-        }
-      });
-    }
-  }, [user]);
-
-  return user ? <div className="mt-3"></div> : <h1></h1>;
 }
 
 // Component: EditProfileButton (เพิ่มฟีเจอร์เปลี่ยนรูปโปรไฟล์)
