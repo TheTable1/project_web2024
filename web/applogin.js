@@ -26,19 +26,30 @@ class App extends React.Component {
     this.state = {
       user: null,
       subjects: [],
+      classroom: [],
       newSubject: "",
       newSubjectCode: "",
       newRoom: "",
+      newClassroomname: "",
+      newClassroomowner: "",
+      Classroomstudent: [],
+      Classstatus: "",
       subjectToEdit: null,
       showSubjects: false,
+      showClassroom: false,
     };
-    this.toggleSubjects = this.toggleSubjects.bind(this);
+   
   }
 
   toggleSubjects = () => {
     console.log("666666");
-    this.setState((prevState) => ({ showSubjects: !prevState.showSubjects }));
+    this.setState({ showSubjects: true, showClassroom: false });
   };
+
+  toggleClassroom = () => {
+    console.log("666666");
+    this.setState({ showClassroom: true, showSubjects: false });
+  }
 
   componentDidMount() {
     auth.onAuthStateChanged((user) => {
@@ -53,22 +64,50 @@ class App extends React.Component {
   }
 
   // โหลดข้อมูลรายวิชา จาก path /users/{user.uid}/classroom
-  loadSubjects = () => {
+  loadSubjects = async () => {
     const { user } = this.state;
     if (!user) return;
-    db.collection("users")
-      .doc(user.uid)
-      .collection("classroom")
-      .get()
-      .then((querySnapshot) => {
-        let subjects = [];
-        querySnapshot.forEach((doc) => {
-          subjects.push({ id: doc.id, ...doc.data() });
-        });
-        this.setState({ subjects });
-      })
-      .catch((error) => console.error("Error fetching subjects:", error));
+  
+    try {
+      const querySnapshot = await db.collection("users")
+        .doc(user.uid)
+        .collection("classroom")
+        .get();
+  
+      let subjects = [];
+  
+      for (const classroomDoc of querySnapshot.docs) {
+        const cid = classroomDoc.id; // Classroom ID
+  
+        // Fetch the 'info' document inside each classroom
+        const infoDoc = await db.collection("users")
+          .doc(user.uid)
+          .collection("classroom")
+          .doc(cid)
+          .collection("info")
+          .doc("details") // Assuming the doc ID is "details"
+          .get();
+  
+        if (infoDoc.exists) {
+          subjects.push({
+            id: cid,
+            owner: user.uid,
+            ...infoDoc.data(), // Spread info data (code, name, photo, room)
+          });
+        } else {
+          console.warn(`No info found for classroom ${cid}`); // ⚠️ Debug Log
+        }
+      }
+  
+      this.setState({ subjects }, () => {
+        console.log("All Subjects Loaded:", this.state.subjects); // ✅ Debug Log
+      });
+  
+    } catch (error) {
+      console.error("Error fetching subjects:", error);
+    }
   };
+  
 
   // Handlers สำหรับ input ของวิชา
   handleSubjectChange = (event) => {
@@ -90,18 +129,32 @@ class App extends React.Component {
     db.collection("users")
       .doc(user.uid)
       .collection("classroom")
-      .add({
-        name: newSubject,
+      .add({ 
+        owner: user.uid,
+        students : [],
+        checkin: [],
+      })
+    .then((docRef) => {
+      return db.collection("users")
+      .doc(user.uid)
+      .collection("classroom")
+      .doc(docRef.id)
+      .collection("info")
+      .doc("details")
+      .set({
         code: newSubjectCode,
+        name: newSubject,
+        photo: "",
         room: newRoom,
-      })
-      .then(() => {
-        alert("Subject added successfully!");
-        this.setState({ newSubject: "", newSubjectCode: "", newRoom: "" });
-        this.loadSubjects();
-      })
-      .catch((error) => console.error("Error adding subject:", error));
-  };
+      });
+    })
+    .then(() => {
+      alert("Subject added successfully!");
+      this.setState({ newSubject: "", newSubjectCode: "", newRoom: "" });
+      this.loadSubjects();
+    })
+    .catch((error) => console.error("Error adding subject:", error));
+};
 
   editSubject = (subject) => {
     this.setState({
@@ -199,9 +252,15 @@ class App extends React.Component {
         <Card className="shadow-sm">
           <Card.Body>
             <LoginBox user={this.state.user} app={this} />
+            <div >
             <Button variant="success" className="mt-2" onClick={this.toggleSubjects}><i className="bi bi-pencil-square me-2">
-        </i> View Classroom
+        </i> Subject
       </Button>
+      <Button variant="success" className="mt-2 ms-3" onClick={this.toggleClassroom}><i className="bi bi-pencil-square me-2">
+        </i> Classroom
+      </Button>
+            </div>
+            
             {this.state.user && this.state.showSubjects && (
               <div className="mt-4">
                 <h3 className="text-primary mb-3">Manage Subjects</h3>
@@ -293,6 +352,7 @@ class App extends React.Component {
                 />
               </div>
             )}
+
           </Card.Body>
         </Card>
       </Container>
