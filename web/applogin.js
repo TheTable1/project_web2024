@@ -32,16 +32,15 @@ class App extends React.Component {
   }
 
   componentDidMount() {
+    // เมื่อ component ถูกโหลดเข้ามา จะเริ่มตรวจสอบสถานะผู้ใช้
     auth.onAuthStateChanged((user) => {
       if (user) {
         this.setState({ user: user.toJSON() });
+        this.loadSubjects(); // เรียกใช้ loadSubjects เพื่อโหลดข้อมูลวิชาทันทีเมื่อผู้ใช้เข้าสู่ระบบ
       } else {
         this.setState({ user: null });
       }
     });
-
-    this.loadStudents();
-    this.loadSubjects();
   }
 
   loadStudents = () => {
@@ -57,15 +56,21 @@ class App extends React.Component {
   };
 
   loadSubjects = () => {
+    const { user } = this.state;
+    if (!user) return;
+
+    // ดึงข้อมูลวิชาจาก Firestore
     db.collection("subjects")
+      .where("userId", "==", user.uid) // ใช้ userId เพื่อดึงข้อมูลของผู้ใช้แต่ละคน
       .get()
       .then((querySnapshot) => {
         let subjects = [];
         querySnapshot.forEach((doc) => {
           subjects.push({ id: doc.id, ...doc.data() });
         });
-        this.setState({ subjects });
-      });
+        this.setState({ subjects }); // อัพเดต state subjects ด้วยข้อมูลที่ดึงมา
+      })
+      .catch((error) => console.error("Error fetching subjects:", error));
   };
 
   handleSubjectChange = (event) => {
@@ -77,7 +82,7 @@ class App extends React.Component {
   };
 
   addSubject = () => {
-    const { newSubject, newSubjectCode } = this.state;
+    const { newSubject, newSubjectCode, user } = this.state;
     if (newSubject.trim() === "" || newSubjectCode.trim() === "") {
       alert("Please enter both subject name and subject code.");
       return;
@@ -87,11 +92,12 @@ class App extends React.Component {
       .add({
         name: newSubject,
         code: newSubjectCode,
+        userId: user.uid, // ผูกกับ user ที่เพิ่มวิชานี้
       })
       .then(() => {
         alert("Subject added successfully!");
         this.setState({ newSubject: "", newSubjectCode: "" });
-        this.refreshSubjects();
+        this.loadSubjects(); // โหลดใหม่หลังเพิ่มวิชา
       })
       .catch((error) => console.error("Error adding subject:", error));
   };
@@ -119,7 +125,11 @@ class App extends React.Component {
       })
       .then(() => {
         alert("Subject updated successfully!");
-        this.setState({ newSubject: "", newSubjectCode: "", subjectToEdit: null });
+        this.setState({
+          newSubject: "",
+          newSubjectCode: "",
+          subjectToEdit: null,
+        });
         this.refreshSubjects();
       })
       .catch((error) => console.error("Error updating subject:", error));
@@ -218,7 +228,11 @@ class App extends React.Component {
                     />
                   </Col>
                   <Col md={4}>
-                    <Button variant="success" onClick={this.addSubject} className="w-100">
+                    <Button
+                      variant="success"
+                      onClick={this.addSubject}
+                      className="w-100"
+                    >
                       Add Subject
                     </Button>
                   </Col>
@@ -229,13 +243,25 @@ class App extends React.Component {
                     <h4 className="text-warning">Edit Subject</h4>
                     <Row className="mb-2">
                       <Col>
-                        <Form.Control type="text" value={this.state.newSubject} onChange={this.handleSubjectChange} />
+                        <Form.Control
+                          type="text"
+                          value={this.state.newSubject}
+                          onChange={this.handleSubjectChange}
+                        />
                       </Col>
                       <Col>
-                        <Form.Control type="text" value={this.state.newSubjectCode} onChange={this.handleSubjectCodeChange} />
+                        <Form.Control
+                          type="text"
+                          value={this.state.newSubjectCode}
+                          onChange={this.handleSubjectCodeChange}
+                        />
                       </Col>
                       <Col>
-                        <Button variant="primary" onClick={this.updateSubject} className="w-100">
+                        <Button
+                          variant="primary"
+                          onClick={this.updateSubject}
+                          className="w-100"
+                        >
                           Update Subject
                         </Button>
                       </Col>
@@ -243,7 +269,11 @@ class App extends React.Component {
                   </div>
                 )}
 
-                <SubjectTable subjects={this.state.subjects} onDelete={this.deleteSubject} onEdit={this.editSubject} />
+                <SubjectTable
+                  subjects={this.state.subjects}
+                  onDelete={this.deleteSubject}
+                  onEdit={this.editSubject}
+                />
               </div>
             )}
           </Card.Body>
