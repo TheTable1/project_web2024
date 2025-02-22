@@ -29,8 +29,15 @@ class App extends React.Component {
       newSubject: "",
       newSubjectCode: "",
       subjectToEdit: null,
+      showSubjects: false,
     };
+    this.toggleSubjects = this.toggleSubjects.bind(this);
   }
+
+  toggleSubjects = () => {
+    console.log("666666");
+    this.setState((prevState) => ({ showSubjects: !prevState.showSubjects }));
+  };
 
   componentDidMount() {
     // เมื่อ component ถูกโหลดเข้ามา จะเริ่มตรวจสอบสถานะผู้ใช้
@@ -43,6 +50,13 @@ class App extends React.Component {
         this.setState({ user: null });
       }
     });
+<<<<<<< Updated upstream
+=======
+
+    this.loadStudents();
+    this.loadSubjects();
+    
+>>>>>>> Stashed changes
   }
 
   loadStudents = () => {
@@ -219,9 +233,9 @@ class App extends React.Component {
         <Card className="shadow-sm">
           <Card.Body>
             <LoginBox user={this.state.user} app={this} />
-            <Info user={this.state.user} app={this} />
+            <Info user={this.state.user} app={this} toggleSubjects={this.toggleSubjects} />
 
-            {this.state.user && (
+            {this.state.user && this.state.showSubjects && (
               <div className="mt-4">
                 <h3 className="text-primary mb-3">Manage Subjects</h3>
 
@@ -386,6 +400,11 @@ function LoginBox({ user, app }) {
 <<<<<<< Updated upstream
 // Component: Info
 function Info({ user }) {
+=======
+
+// ✅ Component: Info
+function Info({ user ,toggleSubjects }) {
+>>>>>>> Stashed changes
   const [phone, setPhone] = React.useState("");
 
   React.useEffect(() => {
@@ -406,6 +425,16 @@ function Info({ user }) {
       <h4>Email: {user.email}</h4>
       <h4>Phone: {phone}</h4>
       <EditProfileButton user={user} />
+<<<<<<< Updated upstream
+=======
+      <Button variant="success" className="mt-2" onClick={toggleSubjects}><i className="bi bi-pencil-square me-2">
+        </i> View Classroom
+      </Button>
+      <Button variant="success" className="mt-2" onClick={toggleSubjects}><i className="bi bi-pencil-square me-2">
+        </i> View Classroom
+      </Button>
+      
+>>>>>>> Stashed changes
     </div>
   ) : (
     <h1></h1>
@@ -499,4 +528,8 @@ root.render(
   <React.StrictMode>
     <App />
   </React.StrictMode>
+<<<<<<< Updated upstream
 );
+=======
+);
+>>>>>>> Stashed changes
