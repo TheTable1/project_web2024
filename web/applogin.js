@@ -35,8 +35,9 @@ class App extends React.Component {
     // เมื่อ component ถูกโหลดเข้ามา จะเริ่มตรวจสอบสถานะผู้ใช้
     auth.onAuthStateChanged((user) => {
       if (user) {
-        this.setState({ user: user.toJSON() });
-        this.loadSubjects(); // เรียกใช้ loadSubjects เพื่อโหลดข้อมูลวิชาทันทีเมื่อผู้ใช้เข้าสู่ระบบ
+        this.setState({ user: user.toJSON() }, () => {
+          this.loadSubjects(); // เรียกใช้ loadSubjects เมื่อผู้ใช้เข้าสู่ระบบ
+        });
       } else {
         this.setState({ user: null });
       }
@@ -130,7 +131,7 @@ class App extends React.Component {
           newSubjectCode: "",
           subjectToEdit: null,
         });
-        this.refreshSubjects();
+        this.loadSubjects();
       })
       .catch((error) => console.error("Error updating subject:", error));
   };
@@ -142,7 +143,7 @@ class App extends React.Component {
         .delete()
         .then(() => {
           alert("Subject deleted successfully!");
-          this.refreshSubjects();
+          this.loadSubjects(); // เรียกใช้ loadSubjects เพื่อโหลดข้อมูลวิชาใหม่
         })
         .catch((error) => console.error("Error deleting subject:", error));
     }
