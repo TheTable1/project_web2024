@@ -50,13 +50,10 @@ class App extends React.Component {
         this.setState({ user: null });
       }
     });
-<<<<<<< Updated upstream
-=======
+
 
     this.loadStudents();
     this.loadSubjects();
-    
->>>>>>> Stashed changes
   }
 
   loadStudents = () => {
@@ -425,8 +422,6 @@ function Info({ user ,toggleSubjects }) {
       <h4>Email: {user.email}</h4>
       <h4>Phone: {phone}</h4>
       <EditProfileButton user={user} />
-<<<<<<< Updated upstream
-=======
       <Button variant="success" className="mt-2" onClick={toggleSubjects}><i className="bi bi-pencil-square me-2">
         </i> View Classroom
       </Button>
@@ -434,7 +429,6 @@ function Info({ user ,toggleSubjects }) {
         </i> View Classroom
       </Button>
       
->>>>>>> Stashed changes
     </div>
   ) : (
     <h1></h1>
@@ -528,8 +522,4 @@ root.render(
   <React.StrictMode>
     <App />
   </React.StrictMode>
-<<<<<<< Updated upstream
 );
-=======
-);
->>>>>>> Stashed changes
