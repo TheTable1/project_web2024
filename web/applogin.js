@@ -30,8 +30,15 @@ class App extends React.Component {
       newSubjectCode: "",
       newRoom: "",
       subjectToEdit: null,
+      showSubjects: false,
     };
+    this.toggleSubjects = this.toggleSubjects.bind(this);
   }
+
+  toggleSubjects = () => {
+    console.log("666666");
+    this.setState((prevState) => ({ showSubjects: !prevState.showSubjects }));
+  };
 
   componentDidMount() {
     auth.onAuthStateChanged((user) => {
@@ -43,6 +50,10 @@ class App extends React.Component {
         this.setState({ user: null });
       }
     });
+
+
+    this.loadStudents();
+    this.loadSubjects();
   }
 
   // โหลดข้อมูลรายวิชา จาก path /users/{user.uid}/classroom
@@ -192,8 +203,9 @@ class App extends React.Component {
         <Card className="shadow-sm">
           <Card.Body>
             <LoginBox user={this.state.user} app={this} />
-            <Info user={this.state.user} app={this} />
-            {this.state.user && (
+            <Info user={this.state.user} app={this} toggleSubjects={this.toggleSubjects} />
+
+            {this.state.user && this.state.showSubjects && (
               <div className="mt-4">
                 <h3 className="text-primary mb-3">Manage Subjects</h3>
                 {/* ฟอร์มสำหรับเพิ่มวิชาใหม่ */}
@@ -335,9 +347,54 @@ function SubjectTable({ subjects, onDelete, onEdit }) {
 
 // Component: LoginBox (ดึงข้อมูลผู้ใช้จาก Firestore เพื่อแสดงข้อมูลโปรไฟล์)
 function LoginBox({ user, app }) {
+
   const [userData, setUserData] = React.useState(null);
   const [name, setName] = React.useState("");
   const [email, setEmail] = React.useState("");
+
+  return user ? (
+    <Card className="p-4 shadow-sm bg-light text-center">
+      <div className="d-flex align-items-center justify-content-center">
+        <img
+          src={user.photoURL}
+          alt="User Avatar"
+          className="rounded-circle border border-3 border-primary"
+          style={{ width: "80px", height: "80px", objectFit: "cover" }}
+        />
+      </div>
+      <h4 className="mt-3 text-dark">{user.displayName}</h4>
+      <p className="text-muted">{user.email}</p>
+      <Button
+        onClick={app.google_logout}
+        variant="secondary"
+        className="ms-auto px-4 py-2"
+      >
+        <i className="bi bi-box-arrow-right me-2" style={{ color: "gray" }}></i>{" "}
+        Logout
+      </Button>
+    </Card>
+  ) : (
+    <div
+      className="d-flex vh-100 justify-content-center align-items-center"
+      style={{ background: "#f8f9fa" }}
+    >
+      <Card className="p-5 shadow-lg text-center">
+        <h2 className="mb-4 text-primary fw-bold">กรุณาเข้าสู่ระบบ</h2>
+        <Button
+          variant="primary"
+          onClick={app.google_login}
+          className="px-4 py-2 fw-bold shadow-sm"
+        >
+          <i className="bi bi-google me-2"></i> Login with Google
+        </Button>
+      </Card>
+    </div>
+  );
+}
+
+
+// ✅ Component: Info
+function Info({ user ,toggleSubjects }) {
   const [phone, setPhone] = React.useState("");
 
   React.useEffect(() => {
