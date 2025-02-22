@@ -499,3 +499,108 @@ root.render(
     <App />
   </React.StrictMode>
 );
+
+
+//---//
+const express = require("express");
+const admin = require("firebase-admin");
+const bodyParser = require("body-parser");
+const cors = require("cors");
+
+// 🔥 กำหนด CORS ให้ทุกโดเมนเข้าถึง API ได้
+const app = express();
+app.use(cors({ 
+  origin: "*",
+  methods: ["GET", "POST", "DELETE"],
+  allowedHeaders: ["Content-Type"]
+}));
+app.use(bodyParser.json());
+
+// 🔥 Initialize Firebase Admin
+const serviceAccount = require("./path/to/your/firebase-service-account.json");
+
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount),
+});
+
+const dbb = admin.firestore();
+const PORT = 3000;
+
+/**
+ * 📌 API: ตั้งคำถามโดยอาจารย์
+ * Endpoint: POST /users/:uid/classroom/:cid/question
+ */
+app.post("/users/:uid/classroom/:cid/question", async (req, res) => {
+  const { uid, cid } = req.params;
+  const { question_no, question_text, question_show } = req.body;
+
+  try {
+    await dbb.collection("users")
+      .doc(uid)
+      .collection("classroom")
+      .doc(cid)
+      .set({
+        question_no,
+        question_text,
+        question_show
+      }, { merge: true });
+
+    res.status(200).json({ message: "✅ Question set successfully" });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * 📌 API: ดึงคำถามจากห้องเรียน
+ * Endpoint: GET /users/:uid/classroom/:cid/question
+ */
+app.get("/users/:uid/classroom/:cid/question", async (req, res) => {
+  const { uid, cid } = req.params;
+  try {
+    const doc = await dbb.collection("users")
+      .doc(uid)
+      .collection("classroom")
+      .doc(cid)
+      .get();
+
+    if (!doc.exists) {
+      return res.status(404).json({ message: "No question found" });
+    }
+
+    res.status(200).json(doc.data());
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * 📌 API: ลบคำถาม
+ * Endpoint: DELETE /users/:uid/classroom/:cid/question
+ */
+app.delete("/users/:uid/classroom/:cid/question", async (req, res) => {
+  const { uid, cid } = req.params;
+  try {
+    await dbb.collection("users")
+      .doc(uid)
+      .collection("classroom")
+      .doc(cid)
+      .update({
+        question_no: admin.firestore.FieldValue.delete(),
+        question_text: admin.firestore.FieldValue.delete(),
+        question_show: admin.firestore.FieldValue.delete()
+      });
+
+    res.status(200).json({ message: "✅ Question deleted successfully" });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 🔥 Start server
+app.listen(PORT, () => {
+  console.log(`✅ Server running on port ${PORT}`);
+});
+
+
+

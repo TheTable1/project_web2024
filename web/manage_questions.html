@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>สร้างคำถาม</title>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+    
+    <style>
+        /* Layout */
+body {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-family: 'Poppins', sans-serif;
+    background: linear-gradient(to right, #4A90E2, #9147FF);
+    color: #333;
+    text-align: center;
+    height: 100vh;
+    margin: 0;
+}
+
+/* Card Container */
+.container {
+    max-width: 420px;
+    background: #fff;
+    padding: 30px;
+    border-radius: 16px;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+    transition: 0.3s;
+}
+
+.container:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 12px 25px rgba(0, 0, 0, 0.2);
+}
+
+/* Header */
+h2 {
+    font-size: 20px;
+    font-weight: bold;
+    margin-bottom: 20px;
+    color: #333;
+}
+
+/* Input & Textarea */
+input, textarea {
+    width: 100%;
+    padding: 14px;
+    margin-top: 12px;
+    border-radius: 8px;
+    border: 1px solid #ddd;
+    background: #F8F8F8;
+    color: #555;
+    font-size: 14px;
+    transition: 0.3s;
+    text-align: left;
+}
+
+input::placeholder, textarea::placeholder {
+    color: #999;
+}
+
+input:focus, textarea:focus {
+    background: #fff;
+    border-color: #4A90E2;
+    outline: none;
+    box-shadow: 0 0 5px rgba(74, 144, 226, 0.4);
+}
+
+/* Checkbox */
+label {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    font-size: 14px;
+    margin-top: 12px;
+    color: #666;
+    cursor: pointer;
+}
+
+input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    margin-right: 10px;
+    accent-color: #4A90E2;
+}
+
+/* Button */
+button {
+    background: linear-gradient(to right, #4A90E2, #9147FF);
+    color: white;
+    border: none;
+    padding: 14px;
+    cursor: pointer;
+    border-radius: 30px;
+    width: 100%;
+    margin-top: 18px;
+    font-size: 16px;
+    font-weight: bold;
+    transition: 0.3s;
+    box-shadow: 0 4px 10px rgba(74, 144, 226, 0.3);
+}
+
+button:hover {
+    background: linear-gradient(to right, #3A7BD5, #8338EC);
+    box-shadow: 0 6px 15px rgba(74, 144, 226, 0.4);
+}
+
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>สร้างคำถามในห้องเรียน</h2>
+        <input type="number" id="questionNo" placeholder="หมายเลขคำถาม">
+        <textarea id="questionText" placeholder="ข้อความคำถาม"></textarea>
+        <label>
+            <input type="checkbox" id="questionShow"> แสดงคำถาม
+        </label>
+        <button onclick="submitQuestion()">บันทึกคำตอบ</button>
+    </div>
+
+    <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        const subjectId = urlParams.get('subjectId');
+
+        console.log(subjectId);
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDpyi2trOVCMFZfTRTClLUSv9urSqFpmLA",
+            authDomain: "projectweb-150fc.firebaseapp.com",
+            projectId: "projectweb-150fc",
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+
+        firebase.auth().onAuthStateChanged((user) => {
+            if (user) {
+                const currentUserUID = user.uid;
+                db.collection("users")
+                .doc(currentUserUID)
+                .collection("classroom")
+                .doc(subjectId)
+                .get()
+                .then((doc) => {
+                    if (doc.exists) {
+                        const data = doc.data();
+                        document.getElementById("display-subjectCode").innerText = data.code || "ไม่ระบุ";
+                        document.getElementById("display-subjectName").innerText = data.name || "ไม่ระบุ";
+                    }
+                });
+            }
+        });
+
+        async function submitQuestion() {
+            const questionNo = document.getElementById("questionNo").value.trim();
+            const questionText = document.getElementById("questionText").value.trim();
+            const questionShow = document.getElementById("questionShow").checked;
+
+            const urlParams = new URLSearchParams(window.location.search);
+            const subjectId = urlParams.get('subjectId');
+
+            if (!subjectId) {
+                alert("❌ ไม่พบรหัสวิชา!");
+                return;
+            }
+
+            if (questionNo === "" || questionText === "") {
+                alert("❌ กรุณากรอกข้อมูลให้ครบถ้วน");
+                return;
+            }
+
+            firebase.auth().onAuthStateChanged(user => {
+                if (!user) {
+                    alert("❌ กรุณาเข้าสู่ระบบก่อน");
+                    return;
+                }
+
+                const userId = user.uid;
+
+                db.collection("users")
+                  .doc(userId)
+                  .collection("classroom")
+                  .doc(subjectId)
+                  .set({ subjectId: subjectId }, { merge: true })
+                  .then(() => {
+                      return db.collection("users")
+                          .doc(userId)
+                          .collection("classroom")
+                          .doc(subjectId)
+                          .collection("question")
+                          .add({
+                              question_no: questionNo,
+                              question_text: questionText,
+                              question_show: questionShow
+                          });
+                  })
+                  .then(() => {
+                      alert("✅ บันทึกคำถามสำเร็จ!");
+                      document.querySelectorAll("input").forEach(input => input.value = ""); 
+                      window.location.href = "manageClass.html";
+                  })
+                  .catch(error => {
+                      console.error("❌ เกิดข้อผิดพลาด: ", error);
+                  });
+            });
+        }
+    </script>
+</body>
+</html>
