@@ -30,8 +30,15 @@ class App extends React.Component {
       newSubjectCode: "",
       newRoom: "",
       subjectToEdit: null,
+      showSubjects: false,
     };
+    this.toggleSubjects = this.toggleSubjects.bind(this);
   }
+
+  toggleSubjects = () => {
+    console.log("666666");
+    this.setState((prevState) => ({ showSubjects: !prevState.showSubjects }));
+  };
 
   componentDidMount() {
     auth.onAuthStateChanged((user) => {
@@ -192,8 +199,11 @@ class App extends React.Component {
         <Card className="shadow-sm">
           <Card.Body>
             <LoginBox user={this.state.user} app={this} />
+            <Button variant="success" className="mt-2" onClick={this.toggleSubjects}><i className="bi bi-pencil-square me-2">
+        </i> View Classroom
+      </Button>
             <Info user={this.state.user} app={this} />
-            {this.state.user && (
+            {this.state.user && this.state.showSubjects && (
               <div className="mt-4">
                 <h3 className="text-primary mb-3">Manage Subjects</h3>
                 {/* ฟอร์มสำหรับเพิ่มวิชาใหม่ */}
