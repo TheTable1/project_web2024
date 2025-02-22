@@ -383,6 +383,7 @@ function LoginBox({ user, app }) {
   );
 }
 
+<<<<<<< Updated upstream
 // Component: Info
 function Info({ user }) {
   const [phone, setPhone] = React.useState("");
