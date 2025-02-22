@@ -18,8 +18,9 @@ if (!firebase.apps.length) {
 }
 const db = firebase.firestore();
 const auth = firebase.auth();
-const storage = firebase.storage(); // ใช้งาน Firebase Storage
+const storage = firebase.storage(); // ใช้งาน Firebase Storage (แต่ในส่วนนี้จะไม่ใช้สำหรับเปลี่ยนรูปโปรไฟล์)
 
+// Main App Component
 class App extends React.Component {
   constructor(props) {
     super(props);
@@ -460,14 +461,14 @@ function LoginBox({ user, app }) {
         <img
           src={userData?.photo || "/default-avatar.png"}
           alt="User Avatar"
-          className="rounded-circle border border-3 border-primary"
-          style={{ width: "80px", height: "80px", objectFit: "cover" }}
+          className="rounded-circle border border-3 border-primary "
+          style={{ width: "130px", height: "130px", objectFit: "cover" }}
         />
       </div>
-      <h4 className="mt-3 text-dark">{userData?.name || "No Name"}</h4>
+      <h4 className="mt-4 text-dark">{userData?.name || "No Name"}</h4>
       <p className="text-muted mb-1">{userData?.email || "No Email"}</p>
       <p className="text-muted pt-0">{userData?.phone || "No Phone"}</p>
-      <div className="mt-3">
+      <div className="">
         <EditProfileButton
           userId={user.uid}
           currentName={name}
@@ -480,7 +481,7 @@ function LoginBox({ user, app }) {
         variant="secondary"
         className="ms-auto px-4 py-2"
       >
-        <i className="bi bi-box-arrow-right me-2" style={{ color: "gray" }}></i>
+        <i className="bi bi-box-arrow-right me-2" style={{ color: "gray" }}></i>{" "}
         Logout
       </Button>
     </Card>
@@ -498,6 +499,7 @@ function EditProfileButton({
   const [newName, setNewName] = React.useState(currentName);
   const [newEmail, setNewEmail] = React.useState(currentEmail);
   const [newPhone, setNewPhone] = React.useState(currentPhone);
+  // state สำหรับเก็บ URL รูปโปรไฟล์ที่เลือกจาก default images
   const [newProfilePicture, setNewProfilePicture] = React.useState(null);
 
   React.useEffect(() => {
@@ -506,71 +508,48 @@ function EditProfileButton({
     setNewPhone(currentPhone);
   }, [currentName, currentEmail, currentPhone]);
 
-  const handleFileChange = (e) => {
-    if (e.target.files && e.target.files[0]) {
-      setNewProfilePicture(e.target.files[0]);
-    }
-  };
-
   const handleSave = () => {
     const userRef = db.collection("users").doc(userId);
+    let updateData = {
+      name: newName,
+      email: newEmail,
+      phone: newPhone,
+    };
+    // ถ้ามีการเลือก default image ให้บันทึก URL รูปที่เลือกไว้
     if (newProfilePicture) {
-      // อัปโหลดไฟล์ใหม่ไปยัง Storage
-      const storageRef = firebase
-        .storage()
-        .ref(`users/${userId}/profile/${newProfilePicture.name}`);
-      const uploadTask = storageRef.put(newProfilePicture);
-      uploadTask.on(
-        "state_changed",
-        (snapshot) => {
-          // สามารถแสดง progress ได้ที่นี่
-        },
-        (error) => {
-          console.error("Error uploading image:", error);
-        },
-        () => {
-          // เมื่ออัปโหลดเสร็จแล้ว ดึง URL แล้วอัปเดต Firestore
-          uploadTask.snapshot.ref.getDownloadURL().then((downloadURL) => {
-            userRef
-              .update({
-                name: newName,
-                email: newEmail,
-                phone: newPhone,
-                photo: downloadURL,
-              })
-              .then(() => {
-                alert("Profile updated successfully!");
-                setShowModal(false);
-                window.location.reload();
-              })
-              .catch((error) =>
-                console.error("Error updating profile:", error)
-              );
-          });
-        }
-      );
-    } else {
-      // อัปเดตเฉพาะข้อมูลข้อความ
-      userRef
-        .update({
-          name: newName,
-          email: newEmail,
-          phone: newPhone,
-        })
-        .then(() => {
-          alert("Profile updated successfully!");
-          setShowModal(false);
-          window.location.reload();
-        })
-        .catch((error) => console.error("Error updating profile:", error));
+      updateData.photo = newProfilePicture;
     }
+    userRef
+      .update(updateData)
+      .then(() => {
+        alert("Profile updated successfully!");
+        setShowModal(false);
+        window.location.reload();
+      })
+      .catch((error) => console.error("Error updating profile:", error));
   };
+
+  // รายการ default images ที่ให้เลือก (แก้ไขเป็น URL ที่ต้องการได้)
+  const defaultImages = [
+    "/web/default-avatar.jpg",
+    "/web/default-avatar1.jpg",
+    "/web/default-avatar2.jpg",
+    "/web/default-avatar3.jpg",
+    "/web/default-avatar4.jpg",
+    "/web/default-avatar5.jpg",
+    "/web/default-avatar6.jpg",
+    "/web/default-avatar7.jpg",
+    "/web/default-avatar8.jpg",
+    "/web/default-avatar9.jpg",
+    "/web/default-avatar10.jpg",
+    "/web/default-avatar11.jpg",
+  ];
 
   return (
     <>
       <Button
         variant="warning"
-        className="mt-2"
+        className=""
         onClick={() => setShowModal(true)}
       >
         <i className="bi bi-pencil-square me-2"></i> Edit Profile
@@ -610,15 +589,34 @@ function EditProfileButton({
               />
             </Form.Group>
             <Form.Group className="mb-3">
-              <Form.Label>Profile Picture:</Form.Label>
-              <Form.Control type="file" onChange={handleFileChange} />
+              <Form.Label>Select Default Profile Picture:</Form.Label>
+              <div className="d-flex flex-wrap">
+                {defaultImages.map((imgUrl, index) => (
+                  <img
+                    key={index}
+                    src={imgUrl}
+                    alt={`Default ${index}`}
+                    style={{
+                      width: "60px",
+                      height: "60px",
+                      objectFit: "cover",
+                      cursor: "pointer",
+                      border:
+                        newProfilePicture === imgUrl
+                          ? "3px solid #007bff"
+                          : "1px solid #ccc",
+                      borderRadius: "50%",
+                      marginRight: "10px",
+                      marginBottom: "10px",
+                    }}
+                    onClick={() => setNewProfilePicture(imgUrl)}
+                  />
+                ))}
+              </div>
             </Form.Group>
           </Form>
         </Modal.Body>
         <Modal.Footer>
-          <Button variant="secondary" onClick={() => setShowModal(false)}>
-            Cancel
-          </Button>
           <Button variant="success" onClick={handleSave}>
             Save Changes
           </Button>
