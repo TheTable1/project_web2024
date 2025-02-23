@@ -494,7 +494,7 @@ function SubjectDetail({ subject, onBack, userId }) {
   const [showScoresList, setShowScoresList] = React.useState(false);
 
   // สร้าง URL สำหรับรายละเอียดวิชา (ปรับเปลี่ยนได้ตามโปรเจค)
-  const detailURL = `https://yourwebsite.com/subject-details/${subject.id}`;
+  const detailURL = `${subject.id}`;
 
   // เปิดเช็คชื่อ: สร้างเอกสาร checkin ใหม่ใน path /classroom/{cid}/checkin/{cno}
   const openCheckin = async () => {
@@ -592,54 +592,48 @@ function SubjectDetail({ subject, onBack, userId }) {
 >
   ถาม-ตอบ
 </Button>
+
 //----เชื่อมไปหน้าคำถาม---//
 
   // Toggle แสดงรายชื่อผู้เช็คชื่อแบบ Realtime
   const fetchStudents = async () => {
     try {
+      // Reference to the "students" collection in the classroom
       const classroomRef = db
         .collection("users")
         .doc(userId)
         .collection("classroom")
-        .doc(subject.id);
+        .doc(subject.id)
+        .collection("students");
   
-      const docSnapshot = await classroomRef.get();
+      const snapshot = await classroomRef.get(); // Get all students from the collection
   
-      if (!docSnapshot.exists) {
-        console.log("Classroom document not found.");
-        setStudents([]);
-        return;
-      }
-  
-      const data = docSnapshot.data();
-      const studentUids = (data.students || []).map((ref) => ref.id);
-
-    
-      console.log("Student UIDs:", studentUids);
-
-      if (studentUids.length === 0) {
+      if (snapshot.empty) {
         console.log("No students found.");
-        setStudents([]);
+        setStudents([]); // Clear the student list
         return;
       }
   
-      // Fetch all students' info from "users" collection in parallel
+      // Extract student IDs from the snapshot
+      const studentIds = snapshot.docs.map((doc) => doc.id);
+  
+      // Fetch student data from the "users" collection based on the IDs
       const userDocs = await Promise.all(
-        studentUids.map((uid) => db.collection("users").doc(uid).get())
+        studentIds.map((id) => db.collection("users").doc(id).get())
       );
   
-      // Process the user data
+      // Process the user data from the "users" collection
       const studentsList = userDocs
         .filter((doc) => doc.exists)
         .map((doc) => ({ id: doc.id, ...doc.data() }));
   
+      // Update state with the fetched student data
       setStudents(studentsList);
       setShowStudentsList(true);
     } catch (error) {
       console.error("Error fetching students:", error);
     }
   };
-  
 
   // Toggle แสดงคะแนน (Realtime)
   const toggleScoresList = () => {
@@ -758,57 +752,135 @@ function SubjectDetail({ subject, onBack, userId }) {
 
       {/* Students List Table */}
       {showStudentsList && (
-        <div className="mt-4">
-          <h5>รายชื่อผู้ที่เช็คชื่อ</h5>
-          <Table striped bordered hover responsive>
-            <thead className="table-dark">
-              <tr>
-                <th>ลำดับ</th>
-                <th>รหัส</th>
-                <th>ชื่อ</th>
-                <th>หมายเหตุ</th>
-                <th>วันเวลา</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {students.map((student, index) => (
-                <tr key={student.id}>
-                  <td>{index + 1}</td>
-                  <td>{student.code || "-"}</td>
-                  <td>{student.name || "-"}</td>
-                  <td>{student.note || "-"}</td>
-                  <td>
-                    {student.timestamp
-                      ? student.timestamp.toDate().toLocaleString()
-                      : "-"}
-                  </td>
-                  <td>
-                    <Button
-                      variant="danger"
-                      size="sm"
-                      onClick={async () => {
-                        await db
-                          .collection("users")
-                          .doc(userId)
-                          .collection("classroom")
-                          .doc(subject.id)
-                          .collection("checkin")
-                          .doc(currentCheckinNo)
-                          .collection("students")
-                          .doc(student.id)
-                          .delete();
-                      }}
-                    >
-                      Delete
-                    </Button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </Table>
-        </div>
-      )}
+  <div className="mt-4">
+    <h5>รายชื่อนักศึกษาในห้อง</h5>
+    <Table striped bordered hover responsive>
+      <thead className="table-dark">
+        <tr>
+          <th>ลำดับ</th>
+          <th>รหัส</th>
+          <th>ชื่อ</th>
+          <th>สถานะ</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+      {students.map((student, index) => (
+  <tr key={student.id}>
+    <td>{index + 1}</td>
+    <td>{student.stid || "-"}</td>
+    <td>{student.name || "-"}</td>
+    <td>{student.status}</td>
+    <td>
+      {student.status === 0 ? (
+  <>
+    <Button
+  variant="primary"
+  size="sm"
+  onClick={async () => {
+    try {
+      const studentDocRef = db
+        .collection("users")
+        .doc(student.id)
+        .collection("classroom")
+        .doc(subject.id)
+        .collection("students")
+        .doc(student.id);
+      
+      // Check if the student document exists
+      const studentDoc = await studentDocRef.get();
+      if (!studentDoc.exists) {
+        console.log("Student document does not exist.");
+        return;
+      }
+
+      // Update the student's status to 1 (Accepted)
+      await studentDocRef.update({
+        status: 1 // Change the status to 1 (Accepted)
+      });
+
+      // Optionally, update the local state to re-render with updated status
+      setStudents((prevStudents) =>
+        prevStudents.map((s) =>
+          s.id === student.id ? { ...s, status: 1 } : s
+        )
+      );
+
+      console.log("Student accepted:", student.id);
+    } catch (error) {
+      console.error("Error accepting student:", error);
+    }
+  }}
+>
+  Accept
+</Button>
+    <Button
+      variant="danger"
+      size="sm"
+      onClick={async () => {
+        try {
+          // Remove the student from the sub-collection "students"
+          await db
+            .collection("users")
+            .doc(userId)
+            .collection("classroom")
+            .doc(subject.id)
+            .collection("students")
+            .doc(student.id)
+            .delete(); // Delete the student document from "students" collection
+
+          // Now remove the student from the local state to re-render the table
+          setStudents((prevStudents) =>
+            prevStudents.filter((s) => s.id !== student.id)
+          );
+
+          console.log("Student rejected and removed:", student.id);
+        } catch (error) {
+          console.error("Error rejecting student:", error);
+        }
+      }}
+    >
+      Reject
+    </Button>
+  </>
+) : (
+  <Button
+    variant="danger"
+    size="sm"
+    onClick={async () => {
+      try {
+        // Remove the student from the sub-collection "students"
+        await db
+          .collection("users")
+          .doc(userId)
+          .collection("classroom")
+          .doc(subject.id)
+          .collection("students")
+          .doc(student.id)
+          .delete(); // Delete the student document from "students" collection
+
+        // Now remove the student from the local state to re-render the table
+        setStudents((prevStudents) =>
+          prevStudents.filter((s) => s.id !== student.id)
+        );
+
+        console.log("Student rejected and removed:", student.id);
+      } catch (error) {
+        console.error("Error rejecting student:", error);
+      }
+    }}
+  >
+    Delete
+  </Button>
+)}
+    </td>
+  </tr>
+))}
+
+      </tbody>
+    </Table>
+  </div>
+)}
 
       {/* Scores List Table */}
       {showScoresList && (
