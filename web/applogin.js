@@ -20,6 +20,22 @@ const db = firebase.firestore();
 const auth = firebase.auth();
 const storage = firebase.storage();
 
+// Component สำหรับสร้าง QR Code ด้วย QRCode.js
+function QRCodeComponent({ value, size }) {
+  const qrRef = React.useRef(null);
+  React.useEffect(() => {
+    if (qrRef.current) {
+      qrRef.current.innerHTML = "";
+      new QRCode(qrRef.current, {
+        text: value,
+        width: size,
+        height: size,
+      });
+    }
+  }, [value, size]);
+  return <div ref={qrRef}></div>;
+}
+
 // Main App Component
 class App extends React.Component {
   constructor(props) {
@@ -430,7 +446,7 @@ function SubjectTable({ subjects, onDelete, onEdit }) {
                 onClick={() => onDelete(subject.id)}
               >
                 Delete
-              </Button><i class="fa fa-xing" aria-hidden="true"></i>
+              </Button>
             </td>
           </tr>
         ))}
@@ -633,17 +649,18 @@ function SubjectDetail({ subject, onBack, userId }) {
         .doc(userId)
         .collection("classroom")
         .doc(subject.id)
-        .collection("checkin")
-        .doc(currentCheckinNo)
         .collection("scores")
         .onSnapshot((snapshot) => {
           const list = [];
-          snapshot.forEach((doc) => list.push({ id: doc.id, ...doc.data() }));
+          snapshot.forEach((doc) => {
+            list.push({ id: doc.id, ...doc.data() });
+          });
           setScores(list);
         });
       setShowScoresList(true);
     } else {
       setShowScoresList(false);
+      setScores([]);
     }
   };
 
@@ -727,12 +744,9 @@ function SubjectDetail({ subject, onBack, userId }) {
           <Modal.Title>QR Code for {subject.name}</Modal.Title>
         </Modal.Header>
         <Modal.Body className="text-center">
-          <img
-            src={`https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(
-              detailURL
-            )}&size=200x200`}
-            alt="QR Code"
-          />
+          <div className="mx-auto" style={{ width: 200 }}>
+            <QRCodeComponent value={detailURL} size={200} />
+          </div>
           <p className="mt-2">Scan to view subject details</p>
         </Modal.Body>
         <Modal.Footer>
@@ -942,7 +956,7 @@ function EditSubjectModal({
   const [avatar, setAvatar] = React.useState("");
   const [showAvatarModal, setShowAvatarModal] = React.useState(false);
 
-  // เมื่อ modal เปิดขึ้นและมี subject ให้ pre-populate ค่าในฟอร์ม
+  // Pre-populate ข้อมูลเดิมเมื่อ Modal เปิดขึ้นและ subject มีค่า
   React.useEffect(() => {
     if (subject) {
       setName(subject.name || "");
@@ -1036,7 +1050,6 @@ function EditSubjectModal({
     </Modal>
   );
 }
-
 
 // Component: LoginBox (แสดงข้อมูลผู้ใช้)
 function LoginBox({ user, app }) {
