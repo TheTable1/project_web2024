@@ -18,7 +18,7 @@ if (!firebase.apps.length) {
 }
 const db = firebase.firestore();
 const auth = firebase.auth();
-const storage = firebase.storage(); // ใช้งาน Firebase Storage
+const storage = firebase.storage();
 
 // Main App Component
 class App extends React.Component {
@@ -27,21 +27,20 @@ class App extends React.Component {
     this.state = {
       user: null,
       subjects: [],
-      classroom: [],
+      // สำหรับฟอร์มเพิ่มวิชา (Manage Subjects)
       newSubject: "",
       newSubjectCode: "",
       newRoom: "",
-      newClassroomname: "",
-      newClassroomowner: "",
-      Classroomstudent: [],
-      Classstatus: "",
-      subjectToEdit: null,
+      newPhoto: null, // URL ของอวตารที่เลือกสำหรับเพิ่มวิชา
+      // สำหรับการแสดงวิชาใน Classroom/Subject Detail
       showSubjects: false,
       showClassroom: false,
-      selectedClassroom: null, // state สำหรับเก็บวิชาที่เลือกใน Classroom view
-      newPhoto: null, // state สำหรับเก็บ URL รูป (หรือไฟล์ที่อัปโหลด) ที่เลือก
-      showSubjectAvatarModal: false, // state สำหรับแสดง modal เลือกอวตารของวิชา
-      showEditSubjectModal: false, // state สำหรับแสดง modal แก้ไขวิชา
+      selectedSubject: null, // เมื่อเลือกวิชาแล้วให้เก็บไว้ตรงนี้
+      // Modal สำหรับเลือกรูปอวตาร (สำหรับ Add Subject)
+      showSubjectAvatarModal: false,
+      // Modal สำหรับแก้ไขวิชา
+      subjectToEdit: null,
+      showEditSubjectModal: false,
     };
   }
 
@@ -50,11 +49,10 @@ class App extends React.Component {
   };
 
   toggleClassroom = () => {
-    // ตั้งค่า selectedClassroom ให้เป็น null เพื่อให้แสดงรายการวิชาทั้งหมด
     this.setState({
       showClassroom: true,
       showSubjects: false,
-      selectedClassroom: null,
+      selectedSubject: null,
     });
   };
 
@@ -70,7 +68,7 @@ class App extends React.Component {
     });
   }
 
-  // โหลดข้อมูลรายวิชา จาก path /users/{user.uid}/classroom
+  // โหลดข้อมูลวิชา จาก path /users/{user.uid}/classroom
   loadSubjects = async () => {
     const { user } = this.state;
     if (!user) return;
@@ -81,9 +79,8 @@ class App extends React.Component {
         .collection("classroom")
         .get();
       let subjects = [];
-      for (const classroomDoc of querySnapshot.docs) {
-        const cid = classroomDoc.id; // Classroom ID
-        // ดึงเอกสาร info ของแต่ละวิชา
+      for (const doc of querySnapshot.docs) {
+        const cid = doc.id;
         const infoDoc = await db
           .collection("users")
           .doc(user.uid)
@@ -96,10 +93,8 @@ class App extends React.Component {
           subjects.push({
             id: cid,
             owner: user.uid,
-            ...infoDoc.data(), // รวมข้อมูลจาก details (code, name, photo, room)
+            ...infoDoc.data(),
           });
-        } else {
-          console.warn(`No info found for classroom ${cid}`);
         }
       }
       this.setState({ subjects }, () => {
@@ -110,18 +105,18 @@ class App extends React.Component {
     }
   };
 
-  // Handlers สำหรับ input ของวิชา
-  handleSubjectChange = (event) => {
-    this.setState({ newSubject: event.target.value });
+  // Handlers สำหรับฟอร์มเพิ่มวิชา
+  handleSubjectChange = (e) => {
+    this.setState({ newSubject: e.target.value });
   };
-  handleSubjectCodeChange = (event) => {
-    this.setState({ newSubjectCode: event.target.value });
+  handleSubjectCodeChange = (e) => {
+    this.setState({ newSubjectCode: e.target.value });
   };
-  handleSubjectRoomChange = (event) => {
-    this.setState({ newRoom: event.target.value });
+  handleSubjectRoomChange = (e) => {
+    this.setState({ newRoom: e.target.value });
   };
 
-  // เพิ่มวิชาใหม่ (สำหรับกรณีนี้ใช้ default avatar ที่เลือกจาก modal)
+  // เพิ่มวิชาใหม่ (ใช้ข้อมูลจากฟอร์ม Manage Subjects)
   addSubject = async () => {
     const { newSubject, newSubjectCode, newRoom, user, newPhoto } = this.state;
     if (newSubject.trim() === "" || newSubjectCode.trim() === "") {
@@ -138,7 +133,6 @@ class App extends React.Component {
           students: [],
           checkin: [],
         });
-      // หากไม่ได้เลือกอวตารจะได้เป็นค่าว่าง (ระบบจะแสดง default ภายใน UI)
       const photoURL = newPhoto || "";
       await db
         .collection("users")
@@ -154,6 +148,7 @@ class App extends React.Component {
           room: newRoom,
         });
       alert("Subject added successfully!");
+      // reset form (คงเป็นช่องว่าง)
       this.setState({
         newSubject: "",
         newSubjectCode: "",
@@ -166,19 +161,16 @@ class App extends React.Component {
     }
   };
 
-  // เมื่อกด Edit ให้ตั้งค่าข้อมูลของวิชาที่ต้องการแก้ไข และแสดง modal แก้ไข
+  // เมื่อกด Edit ในตารางวิชา จะเปิด Modal แก้ไข (โดยฟอร์มแก้ไขจะเริ่มต้นเป็นช่องว่าง)
   editSubject = (subject) => {
     this.setState({
       subjectToEdit: subject,
-      newSubject: subject.name,
-      newSubjectCode: subject.code,
-      newRoom: subject.room || "",
+      // ไม่ pre-populate ค่าในฟอร์ม Add Subject ให้คงว่างอยู่
       newPhoto: null,
       showEditSubjectModal: true,
     });
   };
 
-  // ปิด modal แก้ไขวิชา
   handleCloseEditSubjectModal = () => {
     this.setState({
       showEditSubjectModal: false,
@@ -187,7 +179,7 @@ class App extends React.Component {
     });
   };
 
-  // อัปเดตข้อมูลวิชา (จาก modal แก้ไข)
+  // ฟังก์ชันอัปเดตวิชา (จะได้รับข้อมูลจาก Modal แก้ไข)
   handleUpdateSubject = async (updated) => {
     const { subjectToEdit, user } = this.state;
     if (!subjectToEdit) return;
@@ -269,11 +261,13 @@ class App extends React.Component {
   };
 
   render() {
+    const { user, subjects, showSubjects, showClassroom, selectedSubject } =
+      this.state;
     return (
       <Container className="mt-4">
         <Card className="shadow-sm">
           <Card.Body>
-            <LoginBox user={this.state.user} app={this} />
+            <LoginBox user={user} app={this} />
             <div>
               <Button
                 variant="success"
@@ -290,11 +284,9 @@ class App extends React.Component {
                 <i className="bi bi-pencil-square me-2"></i> Classroom
               </Button>
             </div>
-
-            {this.state.user && this.state.showSubjects && (
+            {user && showSubjects && (
               <div className="mt-4">
                 <h3 className="text-primary mb-3">Manage Subjects</h3>
-                {/* ฟอร์มสำหรับเพิ่มวิชาใหม่ */}
                 <Row className="mb-3">
                   <Col md={3}>
                     <Form.Control
@@ -323,7 +315,6 @@ class App extends React.Component {
                       className="mb-2"
                     />
                   </Col>
-                  {/* แทนที่ input file ด้วยปุ่มเลือกอวตาร */}
                   <Col md={3}>
                     <Button
                       variant="info"
@@ -358,45 +349,42 @@ class App extends React.Component {
                   </Col>
                 </Row>
                 <SubjectTable
-                  subjects={this.state.subjects}
+                  subjects={subjects}
                   onDelete={this.deleteSubject}
                   onEdit={this.editSubject}
+                  onSelect={(subject) =>
+                    this.setState({ selectedSubject: subject })
+                  }
                 />
               </div>
             )}
-
-            {this.state.user &&
-              this.state.showClassroom &&
-              (this.state.selectedClassroom ? (
-                <ClassroomDetail
-                  subject={this.state.selectedClassroom}
-                  onBack={() => this.setState({ selectedClassroom: null })}
-                />
-              ) : (
-                <ClassroomList
-                  subjects={this.state.subjects}
-                  onSelect={(subject) =>
-                    this.setState({ selectedClassroom: subject })
-                  }
-                />
-              ))}
+            {user && showClassroom && !selectedSubject && (
+              <ClassroomList
+                subjects={subjects}
+                onSelect={(subject) =>
+                  this.setState({ selectedSubject: subject })
+                }
+              />
+            )}
+            {user && showClassroom && selectedSubject && (
+              <SubjectDetail
+                subject={selectedSubject}
+                onBack={() => this.setState({ selectedSubject: null })}
+                userId={user.uid}
+              />
+            )}
           </Card.Body>
         </Card>
-        {/* Modal สำหรับเลือกอวตารของวิชา */}
         {this.state.showSubjectAvatarModal && (
           <SubjectAvatarSelector
             show={this.state.showSubjectAvatarModal}
             currentAvatar={this.state.newPhoto}
             onSelect={(avatar) =>
-              this.setState({
-                newPhoto: avatar,
-                showSubjectAvatarModal: false,
-              })
+              this.setState({ newPhoto: avatar, showSubjectAvatarModal: false })
             }
             onClose={() => this.setState({ showSubjectAvatarModal: false })}
           />
         )}
-        {/* Modal สำหรับแก้ไขวิชา */}
         {this.state.showEditSubjectModal && (
           <EditSubjectModal
             show={this.state.showEditSubjectModal}
@@ -412,8 +400,8 @@ class App extends React.Component {
   }
 }
 
-// Component: SubjectTable
-function SubjectTable({ subjects, onDelete, onEdit }) {
+// Component: SubjectTable (แสดงตารางวิชาใน Manage Subjects)
+function SubjectTable({ subjects, onDelete, onEdit, onSelect }) {
   return (
     <Table striped bordered hover responsive className="mt-4">
       <thead className="table-dark">
@@ -446,6 +434,14 @@ function SubjectTable({ subjects, onDelete, onEdit }) {
               >
                 Delete
               </Button>
+              <Button
+                variant="info"
+                size="sm"
+                className="ms-2"
+                onClick={() => onSelect(subject)}
+              >
+                View Detail
+              </Button>
             </td>
           </tr>
         ))}
@@ -454,7 +450,7 @@ function SubjectTable({ subjects, onDelete, onEdit }) {
   );
 }
 
-// Component: ClassroomList (แสดงรายการวิชาในรูปแบบการ์ด)
+// Component: ClassroomList (แสดงวิชาในรูปแบบการ์ด)
 function ClassroomList({ subjects, onSelect }) {
   return (
     <div className="mt-4">
@@ -482,12 +478,164 @@ function ClassroomList({ subjects, onSelect }) {
   );
 }
 
-// Component: ClassroomDetail (แสดงรายละเอียดของวิชา)
-function ClassroomDetail({ subject, onBack }) {
+// Component: SubjectDetail (หน้ารายละเอียดวิชาพร้อมฟังก์ชันเช็คชื่อ)
+function SubjectDetail({ subject, onBack, userId }) {
+  const [showQRCodeModal, setShowQRCodeModal] = React.useState(false);
+  const [checkinStatus, setCheckinStatus] = React.useState(null); // "open" หรือ "closed"
+  const [currentCheckinNo, setCurrentCheckinNo] = React.useState("");
+  const [students, setStudents] = React.useState([]);
+  const [showStudentsList, setShowStudentsList] = React.useState(false);
+  const [scores, setScores] = React.useState([]);
+  const [showScoresList, setShowScoresList] = React.useState(false);
+
+  // สร้าง URL สำหรับรายละเอียดวิชา (ปรับเปลี่ยนได้ตามโปรเจค)
+  const detailURL = `https://yourwebsite.com/subject-details/${subject.id}`;
+
+  // เปิดเช็คชื่อ: สร้างเอกสาร checkin ใหม่ใน path /classroom/{cid}/checkin/{cno}
+  const openCheckin = async () => {
+    const cno = "checkin_" + Date.now();
+    setCurrentCheckinNo(cno);
+    await db
+      .collection("users")
+      .doc(userId)
+      .collection("classroom")
+      .doc(subject.id)
+      .collection("checkin")
+      .doc(cno)
+      .set({
+        status: "open",
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+    setCheckinStatus("open");
+    alert("เช็คชื่อเปิดแล้ว รหัส: " + cno);
+  };
+
+  // ปิดเช็คชื่อ: อัปเดตสถานะเป็น closed
+  const closeCheckin = async () => {
+    if (!currentCheckinNo) {
+      alert("ไม่มีการเช็คชื่อที่เปิดอยู่");
+      return;
+    }
+    await db
+      .collection("users")
+      .doc(userId)
+      .collection("classroom")
+      .doc(subject.id)
+      .collection("checkin")
+      .doc(currentCheckinNo)
+      .update({ status: "closed" });
+    setCheckinStatus("closed");
+    alert("เช็คชื่อปิดแล้ว");
+  };
+
+  // บันทึกการเช็คชื่อ: คัดลอกข้อมูลจาก students ไป scores โดยเพิ่ม status = 1
+  const saveCheckin = async () => {
+    if (!currentCheckinNo) {
+      alert("ไม่มีการเช็คชื่อที่เปิดอยู่");
+      return;
+    }
+    const studentsSnap = await db
+      .collection("users")
+      .doc(userId)
+      .collection("classroom")
+      .doc(subject.id)
+      .collection("checkin")
+      .doc(currentCheckinNo)
+      .collection("students")
+      .get();
+    const batch = db.batch();
+    studentsSnap.forEach((doc) => {
+      const scoreRef = db
+        .collection("users")
+        .doc(userId)
+        .collection("classroom")
+        .doc(subject.id)
+        .collection("checkin")
+        .doc(currentCheckinNo)
+        .collection("scores")
+        .doc(doc.id);
+      batch.set(scoreRef, { ...doc.data(), status: 1 });
+    });
+    await batch.commit();
+    alert("บันทึกการเช็คชื่อเรียบร้อย");
+  };
+
+  // แสดงรหัสเช็คชื่อ
+  const showCheckinCode = () => {
+    if (!currentCheckinNo) {
+      alert("ไม่มีการเช็คชื่อที่เปิดอยู่");
+    } else {
+      alert("รหัสเช็คชื่อ: " + currentCheckinNo);
+    }
+  };
+
+  // Q&A: ตัวอย่าง placeholder
+  const openQA = () => {
+    alert("เข้าหน้า ถาม-ตอบ");
+  };
+
+  // Toggle แสดงรายชื่อผู้เช็คชื่อแบบ Realtime
+  const toggleStudentsList = () => {
+    if (!showStudentsList) {
+      const unsubscribe = db
+        .collection("users")
+        .doc(userId)
+        .collection("classroom")
+        .doc(subject.id)
+        .collection("checkin")
+        .doc(currentCheckinNo)
+        .collection("students")
+        .onSnapshot((snapshot) => {
+          const list = [];
+          snapshot.forEach((doc) => list.push({ id: doc.id, ...doc.data() }));
+          setStudents(list);
+        });
+      setShowStudentsList(true);
+    } else {
+      setShowStudentsList(false);
+    }
+  };
+
+  // Toggle แสดงคะแนน (Realtime)
+  const toggleScoresList = () => {
+    if (!showScoresList) {
+      const unsubscribe = db
+        .collection("users")
+        .doc(userId)
+        .collection("classroom")
+        .doc(subject.id)
+        .collection("checkin")
+        .doc(currentCheckinNo)
+        .collection("scores")
+        .onSnapshot((snapshot) => {
+          const list = [];
+          snapshot.forEach((doc) => list.push({ id: doc.id, ...doc.data() }));
+          setScores(list);
+        });
+      setShowScoresList(true);
+    } else {
+      setShowScoresList(false);
+    }
+  };
+
+  // ฟังก์ชันอัปเดตคะแนน (แก้ไข input inline)
+  const updateScoreEntry = async (entryId, updatedData) => {
+    await db
+      .collection("users")
+      .doc(userId)
+      .collection("classroom")
+      .doc(subject.id)
+      .collection("checkin")
+      .doc(currentCheckinNo)
+      .collection("scores")
+      .doc(entryId)
+      .update(updatedData);
+  };
+
   return (
     <div className="mt-4">
       <Button variant="secondary" onClick={onBack} className="mb-3">
-        Back
+        ออก
       </Button>
       <Card>
         <Card.Img
@@ -501,8 +649,196 @@ function ClassroomDetail({ subject, onBack }) {
             <strong>Subject Code:</strong> {subject.code} <br />
             <strong>Room:</strong> {subject.room || "-"}
           </Card.Text>
+          <div className="mb-2">
+            <Button variant="primary" onClick={openCheckin} className="me-2">
+              เปิดเช็คชื่อ
+            </Button>
+            <Button variant="warning" onClick={closeCheckin} className="me-2">
+              ปิดเช็คชื่อ
+            </Button>
+            <Button variant="success" onClick={saveCheckin} className="me-2">
+              บันทึกการเช็คชื่อ
+            </Button>
+            <Button variant="info" onClick={showCheckinCode} className="me-2">
+              แสดงรหัสเช็คชื่อ
+            </Button>
+            <Button
+              variant="primary"
+              onClick={() => setShowQRCodeModal(true)}
+              className="me-2"
+            >
+              แสดง QRCode วิชา
+            </Button>
+            <Button variant="secondary" onClick={openQA} className="me-2">
+              ถาม-ตอบ
+            </Button>
+          </div>
+          <div className="mb-2">
+            <Button
+              variant="dark"
+              onClick={toggleStudentsList}
+              className="me-2"
+            >
+              แสดงรายชื่อ
+            </Button>
+            <Button variant="dark" onClick={toggleScoresList} className="me-2">
+              แสดงคะแนน
+            </Button>
+          </div>
         </Card.Body>
       </Card>
+
+      {/* QR Code Modal */}
+      <Modal
+        show={showQRCodeModal}
+        onHide={() => setShowQRCodeModal(false)}
+        centered
+      >
+        <Modal.Header closeButton>
+          <Modal.Title>QR Code for {subject.name}</Modal.Title>
+        </Modal.Header>
+        <Modal.Body className="text-center">
+          <img
+            src={`https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(
+              detailURL
+            )}&size=200x200`}
+            alt="QR Code"
+          />
+          <p className="mt-2">Scan to view subject details</p>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowQRCodeModal(false)}>
+            Close
+          </Button>
+        </Modal.Footer>
+      </Modal>
+
+      {/* Students List Table */}
+      {showStudentsList && (
+        <div className="mt-4">
+          <h5>รายชื่อผู้ที่เช็คชื่อ</h5>
+          <Table striped bordered hover responsive>
+            <thead className="table-dark">
+              <tr>
+                <th>ลำดับ</th>
+                <th>รหัส</th>
+                <th>ชื่อ</th>
+                <th>หมายเหตุ</th>
+                <th>วันเวลา</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {students.map((student, index) => (
+                <tr key={student.id}>
+                  <td>{index + 1}</td>
+                  <td>{student.code || "-"}</td>
+                  <td>{student.name || "-"}</td>
+                  <td>{student.note || "-"}</td>
+                  <td>
+                    {student.timestamp
+                      ? student.timestamp.toDate().toLocaleString()
+                      : "-"}
+                  </td>
+                  <td>
+                    <Button
+                      variant="danger"
+                      size="sm"
+                      onClick={async () => {
+                        await db
+                          .collection("users")
+                          .doc(userId)
+                          .collection("classroom")
+                          .doc(subject.id)
+                          .collection("checkin")
+                          .doc(currentCheckinNo)
+                          .collection("students")
+                          .doc(student.id)
+                          .delete();
+                      }}
+                    >
+                      Delete
+                    </Button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </Table>
+        </div>
+      )}
+
+      {/* Scores List Table */}
+      {showScoresList && (
+        <div className="mt-4">
+          <h5>คะแนนผู้เช็คชื่อ</h5>
+          <Table striped bordered hover responsive>
+            <thead className="table-dark">
+              <tr>
+                <th>ลำดับ</th>
+                <th>รหัส</th>
+                <th>ชื่อ</th>
+                <th>หมายเหตุ</th>
+                <th>วันเวลา</th>
+                <th>คะแนน</th>
+                <th>สถานะ</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {scores.map((score, index) => (
+                <tr key={score.id}>
+                  <td>{index + 1}</td>
+                  <td>{score.code || "-"}</td>
+                  <td>{score.name || "-"}</td>
+                  <td>
+                    <Form.Control
+                      type="text"
+                      defaultValue={score.note || ""}
+                      onBlur={(e) =>
+                        updateScoreEntry(score.id, { note: e.target.value })
+                      }
+                    />
+                  </td>
+                  <td>
+                    {score.timestamp
+                      ? score.timestamp.toDate().toLocaleString()
+                      : "-"}
+                  </td>
+                  <td>
+                    <Form.Control
+                      type="number"
+                      defaultValue={score.score || 0}
+                      onBlur={(e) =>
+                        updateScoreEntry(score.id, {
+                          score: Number(e.target.value),
+                        })
+                      }
+                    />
+                  </td>
+                  <td>
+                    <Form.Control
+                      type="text"
+                      defaultValue={score.status || ""}
+                      onBlur={(e) =>
+                        updateScoreEntry(score.id, { status: e.target.value })
+                      }
+                    />
+                  </td>
+                  <td>
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={() => updateScoreEntry(score.id, score)}
+                    >
+                      Save
+                    </Button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </Table>
+        </div>
+      )}
     </div>
   );
 }
@@ -562,7 +898,7 @@ function SubjectAvatarSelector({ show, onSelect, onClose, currentAvatar }) {
   );
 }
 
-// Component: EditSubjectModal (Modal สำหรับแก้ไขวิชา)
+// Component: EditSubjectModal (Modal สำหรับแก้ไขวิชา โดยเริ่มต้นเป็นช่องว่าง)
 function EditSubjectModal({
   show,
   subject,
@@ -571,20 +907,11 @@ function EditSubjectModal({
   onSave,
   onClose,
 }) {
-  const [name, setName] = React.useState(subject ? subject.name : "");
-  const [code, setCode] = React.useState(subject ? subject.code : "");
-  const [room, setRoom] = React.useState(subject ? subject.room : "");
-  const [avatar, setAvatar] = React.useState(newPhoto || subject.photo || "");
+  const [name, setName] = React.useState("");
+  const [code, setCode] = React.useState("");
+  const [room, setRoom] = React.useState("");
+  const [avatar, setAvatar] = React.useState("");
   const [showAvatarModal, setShowAvatarModal] = React.useState(false);
-
-  React.useEffect(() => {
-    if (subject) {
-      setName(subject.name);
-      setCode(subject.code);
-      setRoom(subject.room);
-      setAvatar(newPhoto || subject.photo || "");
-    }
-  }, [subject, newPhoto, show]);
 
   const handleSave = () => {
     if (name.trim() === "" || code.trim() === "") {
@@ -660,6 +987,9 @@ function EditSubjectModal({
         )}
       </Modal.Body>
       <Modal.Footer>
+        <Button variant="secondary" onClick={onClose}>
+          Cancel
+        </Button>
         <Button variant="primary" onClick={handleSave}>
           Save Changes
         </Button>
@@ -883,7 +1213,7 @@ function EditProfileButton({
   );
 }
 
-// Render App in React
+// Render App
 const container = document.getElementById("myapp");
 const root = ReactDOM.createRoot(container);
 root.render(
