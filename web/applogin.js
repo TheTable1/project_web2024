@@ -39,16 +39,16 @@ class App extends React.Component {
       showSubjects: false,
       showClassroom: false,
       selectedClassroom: null, // state สำหรับเก็บวิชาที่เลือกใน Classroom view
+      newPhoto: null, // state สำหรับเก็บ URL รูป (หรือไฟล์ที่อัปโหลด) ที่เลือก
+      showSubjectAvatarModal: false, // state สำหรับแสดง modal เลือกอวตารของวิชา
     };
   }
 
   toggleSubjects = () => {
-    console.log("666666");
     this.setState({ showSubjects: true, showClassroom: false });
   };
 
   toggleClassroom = () => {
-    console.log("666666");
     // ตั้งค่า selectedClassroom ให้เป็น null เพื่อให้แสดงรายการวิชาทั้งหมด
     this.setState({
       showClassroom: true,
@@ -73,19 +73,15 @@ class App extends React.Component {
   loadSubjects = async () => {
     const { user } = this.state;
     if (!user) return;
-
     try {
       const querySnapshot = await db
         .collection("users")
         .doc(user.uid)
         .collection("classroom")
         .get();
-
       let subjects = [];
-
       for (const classroomDoc of querySnapshot.docs) {
         const cid = classroomDoc.id; // Classroom ID
-
         // ดึงเอกสาร info ของแต่ละวิชา
         const infoDoc = await db
           .collection("users")
@@ -95,7 +91,6 @@ class App extends React.Component {
           .collection("info")
           .doc("details")
           .get();
-
         if (infoDoc.exists) {
           subjects.push({
             id: cid,
@@ -106,7 +101,6 @@ class App extends React.Component {
           console.warn(`No info found for classroom ${cid}`);
         }
       }
-
       this.setState({ subjects }, () => {
         console.log("All Subjects Loaded:", this.state.subjects);
       });
@@ -115,7 +109,7 @@ class App extends React.Component {
     }
   };
 
-  // Handlers สำหรับ input ของวิชา
+  // Handler สำหรับ input ของวิชา
   handleSubjectChange = (event) => {
     this.setState({ newSubject: event.target.value });
   };
@@ -126,67 +120,89 @@ class App extends React.Component {
     this.setState({ newRoom: event.target.value });
   };
 
-  addSubject = () => {
-    const { newSubject, newSubjectCode, newRoom, user } = this.state;
+  // เพิ่มวิชาใหม่ (สำหรับกรณีนี้ใช้ default avatar ที่เลือกจาก modal)
+  addSubject = async () => {
+    const { newSubject, newSubjectCode, newRoom, user, newPhoto } = this.state;
     if (newSubject.trim() === "" || newSubjectCode.trim() === "") {
       alert("Please enter both subject name and subject code.");
       return;
     }
-    db.collection("users")
-      .doc(user.uid)
-      .collection("classroom")
-      .add({
-        owner: user.uid,
-        students: [],
-        checkin: [],
-      })
-      .then((docRef) => {
-        return db
-          .collection("users")
-          .doc(user.uid)
-          .collection("classroom")
-          .doc(docRef.id)
-          .collection("info")
-          .doc("details")
-          .set({
-            code: newSubjectCode,
-            name: newSubject,
-            photo: "",
-            room: newRoom,
-          });
-      })
-      .then(() => {
-        alert("Subject added successfully!");
-        this.setState({ newSubject: "", newSubjectCode: "", newRoom: "" });
-        this.loadSubjects();
-      })
-      .catch((error) => console.error("Error adding subject:", error));
+    try {
+      const docRef = await db
+        .collection("users")
+        .doc(user.uid)
+        .collection("classroom")
+        .add({
+          owner: user.uid,
+          students: [],
+          checkin: [],
+        });
+      // หากไม่ได้เลือกอวตารจะได้เป็นค่าว่าง (ระบบจะแสดง default ภายใน UI)
+      const photoURL = newPhoto || "";
+      await db
+        .collection("users")
+        .doc(user.uid)
+        .collection("classroom")
+        .doc(docRef.id)
+        .collection("info")
+        .doc("details")
+        .set({
+          code: newSubjectCode,
+          name: newSubject,
+          photo: photoURL,
+          room: newRoom,
+        });
+      alert("Subject added successfully!");
+      this.setState({
+        newSubject: "",
+        newSubjectCode: "",
+        newRoom: "",
+        newPhoto: null,
+      });
+      this.loadSubjects();
+    } catch (error) {
+      console.error("Error adding subject:", error);
+    }
   };
 
+  // กำหนดข้อมูลสำหรับแก้ไขวิชา
   editSubject = (subject) => {
     this.setState({
       subjectToEdit: subject,
       newSubject: subject.name,
       newSubjectCode: subject.code,
       newRoom: subject.room || "",
+      newPhoto: null, // เริ่มต้นใหม่สำหรับไฟล์รูปใหม่หรืออวตารที่เลือกใหม่
     });
   };
 
-  updateSubject = () => {
-    const { subjectToEdit, newSubject, newSubjectCode, newRoom, user } =
-      this.state;
+  // อัปเดตข้อมูลวิชา (รองรับการเปลี่ยนรูปจากการเลือกรูปจากอวตาร)
+  updateSubject = async () => {
+    const {
+      subjectToEdit,
+      newSubject,
+      newSubjectCode,
+      newRoom,
+      user,
+      newPhoto,
+    } = this.state;
     if (newSubject.trim() === "" || newSubjectCode.trim() === "") {
       alert("Please enter both subject name and subject code.");
       return;
     }
+    // ถ้าไม่ได้เลือกอวตารใหม่ให้ใช้รูปเดิม
+    const photoURL = newPhoto || subjectToEdit.photo || "";
     db.collection("users")
       .doc(user.uid)
       .collection("classroom")
       .doc(subjectToEdit.id)
+      .collection("info")
+      .doc("details")
       .update({
         name: newSubject,
         code: newSubjectCode,
         room: newRoom,
+        photo: photoURL,
       })
       .then(() => {
         alert("Subject updated successfully!");
@@ -195,6 +211,7 @@ class App extends React.Component {
           newSubjectCode: "",
           newRoom: "",
           subjectToEdit: null,
+          newPhoto: null,
         });
         this.loadSubjects();
       })
@@ -221,7 +238,6 @@ class App extends React.Component {
     const provider = new firebase.auth.GoogleAuthProvider();
     provider.addScope("profile");
     provider.addScope("email");
-
     auth
       .signInWithPopup(provider)
       .then((result) => {
@@ -307,6 +323,30 @@ class App extends React.Component {
                       className="mb-2"
                     />
                   </Col>
+                  {/* แทนที่ input file ด้วยปุ่มเลือกอวตาร */}
+                  <Col md={3}>
+                    <Button
+                      variant="info"
+                      onClick={() =>
+                        this.setState({ showSubjectAvatarModal: true })
+                      }
+                      className="mb-2"
+                    >
+                      Select Avatar
+                    </Button>
+                    {this.state.newPhoto && (
+                      <img
+                        src={this.state.newPhoto}
+                        alt="Selected Avatar"
+                        style={{
+                          width: "60px",
+                          height: "60px",
+                          borderRadius: "50%",
+                          marginTop: "5px",
+                        }}
+                      />
+                    )}
+                  </Col>
                   <Col md={3}>
                     <Button
                       variant="success"
@@ -346,6 +386,30 @@ class App extends React.Component {
                           placeholder="Room"
                         />
                       </Col>
+                      {/* ปุ่มเลือกอวตารในฟอร์มแก้ไข */}
+                      <Col md={3}>
+                        <Button
+                          variant="info"
+                          onClick={() =>
+                            this.setState({ showSubjectAvatarModal: true })
+                          }
+                          className="mb-2"
+                        >
+                          Select Avatar
+                        </Button>
+                        {this.state.newPhoto && (
+                          <img
+                            src={this.state.newPhoto}
+                            alt="Selected Avatar"
+                            style={{
+                              width: "60px",
+                              height: "60px",
+                              borderRadius: "50%",
+                              marginTop: "5px",
+                            }}
+                          />
+                        )}
+                      </Col>
                       <Col md={3}>
                         <Button
                           variant="primary"
@@ -384,6 +448,20 @@ class App extends React.Component {
               ))}
           </Card.Body>
         </Card>
+        {/* Modal สำหรับเลือกอวตารของวิชา */}
+        {this.state.showSubjectAvatarModal && (
+          <SubjectAvatarSelector
+            show={this.state.showSubjectAvatarModal}
+            currentAvatar={this.state.newPhoto}
+            onSelect={(avatar) =>
+              this.setState({
+                newPhoto: avatar,
+                showSubjectAvatarModal: false,
+              })
+            }
+            onClose={() => this.setState({ showSubjectAvatarModal: false })}
+          />
+        )}
       </Container>
     );
   }
@@ -481,6 +559,61 @@ function ClassroomDetail({ subject, onBack }) {
         </Card.Body>
       </Card>
     </div>
+  );
+}
+
+// Component: SubjectAvatarSelector (Modal สำหรับเลือกรูปอวตารของวิชา)
+function SubjectAvatarSelector({ show, onSelect, onClose, currentAvatar }) {
+  const defaultAvatars = [
+    "/web/default-subject.jpg",
+    "/web/default-subject1.jpg",
+    "/web/default-subject2.jpg",
+    "/web/default-subject3.jpg",
+    "/web/default-subject4.jpg",
+    "/web/default-subject5.jpg",
+    "/web/default-subject6.jpg",
+    "/web/default-subject7.jpg",
+    "/web/default-subject8.jpg",
+    "/web/default-subject9.jpg",
+    "/web/default-subject10.jpg",
+    "/web/default-subject11.jpg",
+  ];
+  return (
+    <Modal show={show} onHide={onClose} centered>
+      <Modal.Header closeButton>
+        <Modal.Title>Select Subject Avatar</Modal.Title>
+      </Modal.Header>
+      <Modal.Body>
+        <div className="d-flex flex-wrap">
+          {defaultAvatars.map((avatar, index) => (
+            <img
+              key={index}
+              src={avatar}
+              alt={`Avatar ${index}`}
+              style={{
+                width: "60px",
+                height: "60px",
+                objectFit: "cover",
+                cursor: "pointer",
+                border:
+                  currentAvatar === avatar
+                    ? "3px solid #007bff"
+                    : "1px solid #ccc",
+                borderRadius: "50%",
+                marginRight: "10px",
+                marginBottom: "10px",
+              }}
+              onClick={() => onSelect(avatar)}
+            />
+          ))}
+        </div>
+      </Modal.Body>
+      <Modal.Footer>
+        <Button variant="secondary" onClick={onClose}>
+          Close
+        </Button>
+      </Modal.Footer>
+    </Modal>
   );
 }
 
@@ -628,7 +761,6 @@ function EditProfileButton({
       <Button variant="warning" onClick={() => setShowModal(true)}>
         <i className="bi bi-pencil-square me-2"></i> Edit Profile
       </Button>
-
       <Modal show={showModal} onHide={() => setShowModal(false)} centered>
         <Modal.Header closeButton>
           <Modal.Title>Edit Profile</Modal.Title>
