@@ -259,34 +259,30 @@ class App extends React.Component {
       auth.signOut();
     }
   };
-
+//------1-----///
   render() {
     const { user, subjects, showSubjects, showClassroom, selectedSubject } =
       this.state;
     return (
-      <Container className="mt-4">
+      <Container className="mt-4 p-4 rounded-3 shadow-lg" style={{ background: "#e0e0e0", minHeight: "100vh" }}>
+
         <Card className="shadow-sm">
-          <Card.Body>
-            <LoginBox user={user} app={this} />
-            <div>
-              <Button
-                variant="success"
-                className="mt-2"
-                onClick={this.toggleSubjects}
-              >
-                <i className="bi bi-pencil-square me-2"></i> Subject
-              </Button>
-              <Button
-                variant="success"
-                className="mt-2 ms-3"
-                onClick={this.toggleClassroom}
-              >
-                <i className="bi bi-pencil-square me-2"></i> Classroom
-              </Button>
+          <Card.Body> 
+            <LoginBox user={this.state.user} app={this} />
+            <div >
+            <Button variant="success" className="mt-2" onClick={this.toggleSubjects}><i className="bi bi-pencil-square me-2">
+        </i> Subject
+      </Button>
+      <Button variant="success" className="mt-2 ms-3" onClick={this.toggleClassroom}><i className="bi bi-pencil-square me-2">
+        </i> Classroom
+      </Button>
             </div>
             {user && showSubjects && (
               <div className="mt-4">
-                <h3 className="text-primary mb-3">Manage Subjects</h3>
+
+                <h3 className="mb-3" style={{ color: "black" }}>Manage Subjects</h3>
+
+                {/* ฟอร์มสำหรับเพิ่มวิชาใหม่ */}
                 <Row className="mb-3">
                   <Col md={3}>
                     <Form.Control
@@ -400,8 +396,9 @@ class App extends React.Component {
   }
 }
 
-// Component: SubjectTable (แสดงตารางวิชาใน Manage Subjects)
-function SubjectTable({ subjects, onDelete, onEdit, onSelect }) {
+//-------2----------///
+// Component: SubjectTable
+function SubjectTable({ subjects, onDelete, onEdit }) {
   return (
     <Table striped bordered hover responsive className="mt-4">
       <thead className="table-dark">
@@ -560,11 +557,26 @@ function SubjectDetail({ subject, onBack, userId }) {
       alert("รหัสเช็คชื่อ: " + currentCheckinNo);
     }
   };
+  
+///----------////////////
+  const openQA = (subjectId) => {
+    if (!subjectId) {
+        alert("❌ กรุณาเลือกวิชาก่อนเข้าไปยังหน้าคำถาม!");
+        return;
+    }
+    window.location.href = `manage_questions.html?subjectId=${subjectId}`;
+};
 
-  // Q&A: ตัวอย่าง placeholder
-  const openQA = () => {
-    alert("เข้าหน้า ถาม-ตอบ");
-  };
+// ตัวอย่างการเรียกใช้ (จากปุ่ม)
+<Button 
+  variant="secondary" 
+  size="sm" 
+  className="rounded-3 fw-bold"
+  onClick={() => openQA("CP001002")}  // ใส่ subjectId ที่ต้องการ
+>
+  ถาม-ตอบ
+</Button>
+//----เชื่อมไปหน้าคำถาม---//
 
   // Toggle แสดงรายชื่อผู้เช็คชื่อแบบ Realtime
   const fetchStudents = async () => {
@@ -1178,76 +1190,89 @@ function EditProfileButton({
 
   return (
     <>
-      <Button variant="warning" onClick={() => setShowModal(true)}>
-        <i className="bi bi-pencil-square me-2"></i> Edit Profile
-      </Button>
-      <Modal show={showModal} onHide={() => setShowModal(false)} centered>
-        <Modal.Header closeButton>
-          <Modal.Title>Edit Profile</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <Form>
-            <Form.Group className="mb-3">
-              <Form.Label>Name:</Form.Label>
-              <Form.Control
-                type="text"
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-                placeholder="Enter your name"
-              />
-            </Form.Group>
-            <Form.Group className="mb-3">
-              <Form.Label>Email:</Form.Label>
-              <Form.Control
-                type="email"
-                value={newEmail}
-                onChange={(e) => setNewEmail(e.target.value)}
-                placeholder="Enter your email"
-              />
-            </Form.Group>
-            <Form.Group className="mb-3">
-              <Form.Label>Phone:</Form.Label>
-              <Form.Control
-                type="text"
-                value={newPhone}
-                onChange={(e) => setNewPhone(e.target.value)}
-                placeholder="Enter your phone number"
-              />
-            </Form.Group>
-            <Form.Group className="mb-3">
-              <Form.Label>Select Default Profile Picture:</Form.Label>
-              <div className="d-flex flex-wrap">
-                {defaultImages.map((imgUrl, index) => (
-                  <img
-                    key={index}
-                    src={imgUrl}
-                    alt={`Default ${index}`}
-                    style={{
-                      width: "60px",
-                      height: "60px",
-                      objectFit: "cover",
-                      cursor: "pointer",
-                      border:
-                        newProfilePicture === imgUrl
-                          ? "3px solid #007bff"
-                          : "1px solid #ccc",
-                      borderRadius: "50%",
-                      marginRight: "10px",
-                      marginBottom: "10px",
-                    }}
-                    onClick={() => setNewProfilePicture(imgUrl)}
-                  />
-                ))}
-              </div>
-            </Form.Group>
-          </Form>
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="success" onClick={handleSave}>
-            Save Changes
-          </Button>
-        </Modal.Footer>
-      </Modal>
+<Button
+  variant="light"
+  className="px-3 py-2 fw-bold rounded-pill shadow-sm border-0 text-dark position-absolute top-0 start-0 m-3"
+  style={{ backgroundColor: "#c7c7c7" }}
+  onClick={() => setShowModal(true)}
+>
+  <i className="bi bi-pencil-square me-2"></i> Edit Profile
+</Button>
+
+<Modal show={showModal} onHide={() => setShowModal(false)} centered>
+  <Modal.Header closeButton className="bg-transparent border-0">
+    <Modal.Title className="fw-bold text-dark">Edit Profile</Modal.Title>
+  </Modal.Header>
+  <Modal.Body className="p-4 rounded border-0" style={{
+    background: "#f8f9fa",
+    color: "#333",
+    boxShadow: "none"
+  }}>
+    <Form>
+      <Form.Group className="mb-3">
+        <Form.Label className="fw-semibold">Name:</Form.Label>
+        <Form.Control
+          type="text"
+          value={newName}
+          onChange={(e) => setNewName(e.target.value)}
+          placeholder="Enter your name"
+          className="shadow-sm border-0 rounded-3 px-3 py-2"
+        />
+      </Form.Group>
+      <Form.Group className="mb-3">
+        <Form.Label className="fw-semibold">Email:</Form.Label>
+        <Form.Control
+          type="email"
+          value={newEmail}
+          onChange={(e) => setNewEmail(e.target.value)}
+          placeholder="Enter your email"
+          className="shadow-sm border-0 rounded-3 px-3 py-2"
+        />
+      </Form.Group>
+      <Form.Group className="mb-3">
+        <Form.Label className="fw-semibold">Phone:</Form.Label>
+        <Form.Control
+          type="text"
+          value={newPhone}
+          onChange={(e) => setNewPhone(e.target.value)}
+          placeholder="Enter your phone number"
+          className="shadow-sm border-0 rounded-3 px-3 py-2"
+        />
+      </Form.Group>
+      <Form.Group className="mb-3">
+        <Form.Label className="fw-semibold">Select Default Profile Picture:</Form.Label>
+        <div className="d-flex flex-wrap justify-content-center">
+          {defaultImages.map((imgUrl, index) => (
+            <img
+              key={index}
+              src={imgUrl}
+              alt={`Default ${index}`}
+              className="rounded-circle border border-light shadow-sm mx-2"
+              style={{
+                width: "75px",
+                height: "75px",
+                objectFit: "cover",
+                cursor: "pointer",
+                transition: "all 0.2s ease-in-out",
+                border: newProfilePicture === imgUrl ? "4px solid #007bff" : "2px solid #ddd",
+                boxShadow: "0px 6px 10px rgba(0, 0, 0, 0.15)",
+              }}
+              onMouseOver={(e) => (e.target.style.transform = "scale(1.15)")}
+              onMouseOut={(e) => (e.target.style.transform = "scale(1)")}
+              onClick={() => setNewProfilePicture(imgUrl)}
+            />
+          ))}
+        </div>
+      </Form.Group>
+    </Form>
+  </Modal.Body>
+  <Modal.Footer className="bg-transparent border-0">
+    <Button variant="success" onClick={handleSave} className="px-4 py-2 fw-bold rounded-pill shadow-sm" style={{ backgroundColor: "#c7c7c7", borderColor: "#c7c7c7", color: "#fff" }}>
+      Save Changes
+    </Button>
+  </Modal.Footer>
+</Modal>
+
     </>
   );
 }
@@ -1260,3 +1285,108 @@ root.render(
     <App />
   </React.StrictMode>
 );
+
+
+//---//
+const express = require("express");
+const admin = require("firebase-admin");
+const bodyParser = require("body-parser");
+const cors = require("cors");
+
+// 🔥 กำหนด CORS ให้ทุกโดเมนเข้าถึง API ได้
+const app = express();
+app.use(cors({ 
+  origin: "*",
+  methods: ["GET", "POST", "DELETE"],
+  allowedHeaders: ["Content-Type"]
+}));
+app.use(bodyParser.json());
+
+// 🔥 Initialize Firebase Admin
+const serviceAccount = require("./path/to/your/firebase-service-account.json");
+
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount),
+});
+
+const dbb = admin.firestore();
+const PORT = 3000;
+
+/**
+ * 📌 API: ตั้งคำถามโดยอาจารย์
+ * Endpoint: POST /users/:uid/classroom/:cid/question
+ */
+app.post("/users/:uid/classroom/:cid/question", async (req, res) => {
+  const { uid, cid } = req.params;
+  const { question_no, question_text, question_show } = req.body;
+
+  try {
+    await dbb.collection("users")
+      .doc(uid)
+      .collection("classroom")
+      .doc(cid)
+      .set({
+        question_no,
+        question_text,
+        question_show
+      }, { merge: true });
+
+    res.status(200).json({ message: "✅ Question set successfully" });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * 📌 API: ดึงคำถามจากห้องเรียน
+ * Endpoint: GET /users/:uid/classroom/:cid/question
+ */
+app.get("/users/:uid/classroom/:cid/question", async (req, res) => {
+  const { uid, cid } = req.params;
+  try {
+    const doc = await dbb.collection("users")
+      .doc(uid)
+      .collection("classroom")
+      .doc(cid)
+      .get();
+
+    if (!doc.exists) {
+      return res.status(404).json({ message: "No question found" });
+    }
+
+    res.status(200).json(doc.data());
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * 📌 API: ลบคำถาม
+ * Endpoint: DELETE /users/:uid/classroom/:cid/question
+ */
+app.delete("/users/:uid/classroom/:cid/question", async (req, res) => {
+  const { uid, cid } = req.params;
+  try {
+    await dbb.collection("users")
+      .doc(uid)
+      .collection("classroom")
+      .doc(cid)
+      .update({
+        question_no: admin.firestore.FieldValue.delete(),
+        question_text: admin.firestore.FieldValue.delete(),
+        question_show: admin.firestore.FieldValue.delete()
+      });
+
+    res.status(200).json({ message: "✅ Question deleted successfully" });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 🔥 Start server
+app.listen(PORT, () => {
+  console.log(`✅ Server running on port ${PORT}`);
+});
+
+
+
