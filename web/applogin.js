@@ -433,15 +433,7 @@ function SubjectTable({ subjects, onDelete, onEdit, onSelect }) {
                 onClick={() => onDelete(subject.id)}
               >
                 Delete
-              </Button>
-              <Button
-                variant="info"
-                size="sm"
-                className="ms-2"
-                onClick={() => onSelect(subject)}
-              >
-                View Detail
-              </Button>
+              </Button><i class="fa fa-xing" aria-hidden="true"></i>
             </td>
           </tr>
         ))}
@@ -913,6 +905,16 @@ function EditSubjectModal({
   const [avatar, setAvatar] = React.useState("");
   const [showAvatarModal, setShowAvatarModal] = React.useState(false);
 
+  // เมื่อ modal เปิดขึ้นและมี subject ให้ pre-populate ค่าในฟอร์ม
+  React.useEffect(() => {
+    if (subject) {
+      setName(subject.name || "");
+      setCode(subject.code || "");
+      setRoom(subject.room || "");
+      setAvatar(newPhoto || subject.photo || "");
+    }
+  }, [subject, newPhoto, show]);
+
   const handleSave = () => {
     if (name.trim() === "" || code.trim() === "") {
       alert("Please enter both subject name and subject code.");
@@ -997,6 +999,7 @@ function EditSubjectModal({
     </Modal>
   );
 }
+
 
 // Component: LoginBox (แสดงข้อมูลผู้ใช้)
 function LoginBox({ user, app }) {
