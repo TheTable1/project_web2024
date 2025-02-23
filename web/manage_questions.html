@@ -9,37 +9,41 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
     
     <style>
-        /* Layout */
+       /* Layout */
 body {
     display: flex;
     justify-content: center;
     align-items: center;
     font-family: 'Poppins', sans-serif;
-    background: linear-gradient(to right, #4A90E2, #9147FF);
+    background: linear-gradient(to right, #e0e0e0, #f5f5f5);
     color: #333;
     text-align: center;
     height: 100vh;
     margin: 0;
 }
 
-/* Card Container */
+/* Card Container (Glassmorphism) */
 .container {
-    max-width: 420px;
-    background: #fff;
-    padding: 30px;
+    width: 606px;  /* กำหนดความกว้างตรงกับที่ต้องการ */
+    height: 378px; /* กำหนดความสูงตรงกับที่ต้องการ */
+    max-width: 500px; /* ขยายขนาดกล่อง */
+    padding: 40px; /* เพิ่มพื้นที่ขอบใน */
+    background: rgba(255, 255, 255, 0.3);
     border-radius: 16px;
-    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.4);
     transition: 0.3s;
 }
 
 .container:hover {
     transform: translateY(-5px);
-    box-shadow: 0 12px 25px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 12px 25px rgba(0, 0, 0, 0.15);
 }
 
 /* Header */
 h2 {
-    font-size: 20px;
+    font-size: 22px;
     font-weight: bold;
     margin-bottom: 20px;
     color: #333;
@@ -51,30 +55,30 @@ input, textarea {
     padding: 14px;
     margin-top: 12px;
     border-radius: 8px;
-    border: 1px solid #ddd;
-    background: #F8F8F8;
+    border: 1px solid #ccc;
+    background: rgba(255, 255, 255, 0.6);
     color: #555;
     font-size: 14px;
     transition: 0.3s;
     text-align: left;
+    backdrop-filter: blur(5px);
 }
 
 input::placeholder, textarea::placeholder {
-    color: #999;
+    color: #888;
 }
 
 input:focus, textarea:focus {
-    background: #fff;
-    border-color: #4A90E2;
+    background: rgba(255, 255, 255, 0.8);
+    border-color: #888;
     outline: none;
-    box-shadow: 0 0 5px rgba(74, 144, 226, 0.4);
+    box-shadow: 0 0 5px rgba(0, 0, 0, 0.2);
 }
 
 /* Checkbox */
 label {
     display: flex;
     align-items: center;
-    justify-content: flex-start;
     font-size: 14px;
     margin-top: 12px;
     color: #666;
@@ -85,13 +89,13 @@ input[type="checkbox"] {
     width: 18px;
     height: 18px;
     margin-right: 10px;
-    accent-color: #4A90E2;
+    accent-color: #555;
 }
 
 /* Button */
 button {
-    background: linear-gradient(to right, #4A90E2, #9147FF);
-    color: white;
+    background: linear-gradient(to right, #ddd, #bbb);
+    color: #333;
     border: none;
     padding: 14px;
     cursor: pointer;
@@ -101,12 +105,19 @@ button {
     font-size: 16px;
     font-weight: bold;
     transition: 0.3s;
-    box-shadow: 0 4px 10px rgba(74, 144, 226, 0.3);
+    box-shadow: 0 4px 10px rgba(238, 234, 234, 0.875);
+    border: 1px solid rgba(203, 203, 203, 0.6);
 }
 
 button:hover {
-    background: linear-gradient(to right, #3A7BD5, #8338EC);
-    box-shadow: 0 6px 15px rgba(74, 144, 226, 0.4);
+    background: linear-gradient(to right, #ccc, #aaa);
+    box-shadow: 0 6px 15px rgba(0, 0, 0, 0.2);
+}
+
+/* เพิ่มเอฟเฟกต์ให้ปุ่มกดแล้วดูลึก */
+button:active {
+    transform: scale(0.98);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
     </style>
@@ -159,13 +170,16 @@ button:hover {
             const questionText = document.getElementById("questionText").value.trim();
             const questionShow = document.getElementById("questionShow").checked;
 
-            const urlParams = new URLSearchParams(window.location.search);
-            const subjectId = urlParams.get('subjectId');
+//------------------------///
+        // ตรวจสอบ subjectId จาก URL
+const urlParams = new URLSearchParams(window.location.search);
+const subjectId = urlParams.get('subjectId');
 
-            if (!subjectId) {
-                alert("❌ ไม่พบรหัสวิชา!");
-                return;
-            }
+if (!subjectId) {
+    alert("❌ ไม่พบรหัสวิชา! กำลังนำคุณกลับไปเลือกวิชา...");
+    window.location.href = "indexlogin.html";  // 🔄 กลับหน้าหลักอัตโนมัติ
+}
+//---------------------------------///
 
             if (questionNo === "" || questionText === "") {
                 alert("❌ กรุณากรอกข้อมูลให้ครบถ้วน");

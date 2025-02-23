@@ -557,11 +557,26 @@ function SubjectDetail({ subject, onBack, userId }) {
       alert("รหัสเช็คชื่อ: " + currentCheckinNo);
     }
   };
+  
+///----------////////////
+  const openQA = (subjectId) => {
+    if (!subjectId) {
+        alert("❌ กรุณาเลือกวิชาก่อนเข้าไปยังหน้าคำถาม!");
+        return;
+    }
+    window.location.href = `manage_questions.html?subjectId=${subjectId}`;
+};
 
-  // Q&A: ตัวอย่าง placeholder
-  const openQA = () => {
-    alert("เข้าหน้า ถาม-ตอบ");
-  };
+// ตัวอย่างการเรียกใช้ (จากปุ่ม)
+<Button 
+  variant="secondary" 
+  size="sm" 
+  className="rounded-3 fw-bold"
+  onClick={() => openQA("CP001002")}  // ใส่ subjectId ที่ต้องการ
+>
+  ถาม-ตอบ
+</Button>
+//----เชื่อมไปหน้าคำถาม---//
 
   // Toggle แสดงรายชื่อผู้เช็คชื่อแบบ Realtime
   const toggleStudentsList = () => {
