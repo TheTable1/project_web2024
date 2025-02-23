@@ -433,7 +433,8 @@ function SubjectTable({ subjects, onDelete, onEdit, onSelect }) {
                 onClick={() => onDelete(subject.id)}
               >
                 Delete
-              </Button><i class="fa fa-xing" aria-hidden="true"></i>
+              </Button>
+              <i class="fa fa-xing" aria-hidden="true"></i>
             </td>
           </tr>
         ))}
@@ -574,19 +575,21 @@ function SubjectDetail({ subject, onBack, userId }) {
         .doc(userId)
         .collection("classroom")
         .doc(subject.id)
-        .collection("checkin")
-        .doc(currentCheckinNo)
         .collection("students")
         .onSnapshot((snapshot) => {
           const list = [];
-          snapshot.forEach((doc) => list.push({ id: doc.id, ...doc.data() }));
+          snapshot.forEach((doc) => {
+            list.push({ id: doc.id, ...doc.data() });
+          });
           setStudents(list);
         });
       setShowStudentsList(true);
     } else {
       setShowStudentsList(false);
+      setStudents([]);
     }
   };
+
 
   // Toggle แสดงคะแนน (Realtime)
   const toggleScoresList = () => {
@@ -596,17 +599,18 @@ function SubjectDetail({ subject, onBack, userId }) {
         .doc(userId)
         .collection("classroom")
         .doc(subject.id)
-        .collection("checkin")
-        .doc(currentCheckinNo)
         .collection("scores")
         .onSnapshot((snapshot) => {
           const list = [];
-          snapshot.forEach((doc) => list.push({ id: doc.id, ...doc.data() }));
+          snapshot.forEach((doc) => {
+            list.push({ id: doc.id, ...doc.data() });
+          });
           setScores(list);
         });
       setShowScoresList(true);
     } else {
       setShowScoresList(false);
+      setScores([]);
     }
   };
 
@@ -905,7 +909,7 @@ function EditSubjectModal({
   const [avatar, setAvatar] = React.useState("");
   const [showAvatarModal, setShowAvatarModal] = React.useState(false);
 
-  // เมื่อ modal เปิดขึ้นและมี subject ให้ pre-populate ค่าในฟอร์ม
+  // Pre-populate ข้อมูลเดิมเมื่อ Modal เปิดขึ้นและ subject มีค่า
   React.useEffect(() => {
     if (subject) {
       setName(subject.name || "");
