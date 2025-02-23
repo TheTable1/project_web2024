@@ -41,6 +41,7 @@ class App extends React.Component {
       selectedClassroom: null, // state สำหรับเก็บวิชาที่เลือกใน Classroom view
       newPhoto: null, // state สำหรับเก็บ URL รูป (หรือไฟล์ที่อัปโหลด) ที่เลือก
       showSubjectAvatarModal: false, // state สำหรับแสดง modal เลือกอวตารของวิชา
+      showEditSubjectModal: false, // state สำหรับแสดง modal แก้ไขวิชา
     };
   }
 
@@ -109,7 +110,7 @@ class App extends React.Component {
     }
   };
 
-  // Handler สำหรับ input ของวิชา
+  // Handlers สำหรับ input ของวิชา
   handleSubjectChange = (event) => {
     this.setState({ newSubject: event.target.value });
   };
@@ -165,57 +166,56 @@ class App extends React.Component {
     }
   };
 
-  // กำหนดข้อมูลสำหรับแก้ไขวิชา
+  // เมื่อกด Edit ให้ตั้งค่าข้อมูลของวิชาที่ต้องการแก้ไข และแสดง modal แก้ไข
   editSubject = (subject) => {
     this.setState({
       subjectToEdit: subject,
       newSubject: subject.name,
       newSubjectCode: subject.code,
       newRoom: subject.room || "",
-      newPhoto: null, // เริ่มต้นใหม่สำหรับไฟล์รูปใหม่หรืออวตารที่เลือกใหม่
+      newPhoto: null,
+      showEditSubjectModal: true,
     });
   };
 
-  // อัปเดตข้อมูลวิชา (รองรับการเปลี่ยนรูปจากการเลือกรูปจากอวตาร)
-  updateSubject = async () => {
-    const {
-      subjectToEdit,
-      newSubject,
-      newSubjectCode,
-      newRoom,
-      user,
-      newPhoto,
-    } = this.state;
-    if (newSubject.trim() === "" || newSubjectCode.trim() === "") {
-      alert("Please enter both subject name and subject code.");
-      return;
-    }
-    // ถ้าไม่ได้เลือกอวตารใหม่ให้ใช้รูปเดิม
-    const photoURL = newPhoto || subjectToEdit.photo || "";
-    db.collection("users")
-      .doc(user.uid)
-      .collection("classroom")
-      .doc(subjectToEdit.id)
-      .collection("info")
-      .doc("details")
-      .update({
-        name: newSubject,
-        code: newSubjectCode,
-        room: newRoom,
-        photo: photoURL,
-      })
-      .then(() => {
-        alert("Subject updated successfully!");
-        this.setState({
-          newSubject: "",
-          newSubjectCode: "",
-          newRoom: "",
-          subjectToEdit: null,
-          newPhoto: null,
+  // ปิด modal แก้ไขวิชา
+  handleCloseEditSubjectModal = () => {
+    this.setState({
+      showEditSubjectModal: false,
+      subjectToEdit: null,
+      newPhoto: null,
+    });
+  };
+
+  // อัปเดตข้อมูลวิชา (จาก modal แก้ไข)
+  handleUpdateSubject = async (updated) => {
+    const { subjectToEdit, user } = this.state;
+    if (!subjectToEdit) return;
+    try {
+      const photoURL = updated.photo || subjectToEdit.photo || "";
+      await db
+        .collection("users")
+        .doc(user.uid)
+        .collection("classroom")
+        .doc(subjectToEdit.id)
+        .collection("info")
+        .doc("details")
+        .update({
+          name: updated.name,
+          code: updated.code,
+          room: updated.room,
+          photo: photoURL,
         });
-        this.loadSubjects();
-      })
-      .catch((error) => console.error("Error updating subject:", error));
+      alert("Subject updated successfully!");
+      this.setState({
+        subjectToEdit: null,
+        showEditSubjectModal: false,
+        newPhoto: null,
+      });
+      this.loadSubjects();
+    } catch (error) {
+      console.error("Error updating subject:", error);
+    }
   };
 
   deleteSubject = (subjectId) => {
@@ -357,72 +357,6 @@ class App extends React.Component {
                     </Button>
                   </Col>
                 </Row>
-                {/* ฟอร์มแก้ไขวิชา */}
-                {this.state.subjectToEdit && (
-                  <div className="border p-3 rounded shadow-sm bg-light">
-                    <h4 className="text-warning">Edit Subject</h4>
-                    <Row className="mb-2">
-                      <Col md={3}>
-                        <Form.Control
-                          type="text"
-                          value={this.state.newSubjectCode}
-                          onChange={this.handleSubjectCodeChange}
-                          placeholder="Subject Code"
-                        />
-                      </Col>
-                      <Col md={3}>
-                        <Form.Control
-                          type="text"
-                          value={this.state.newSubject}
-                          onChange={this.handleSubjectChange}
-                          placeholder="Subject Name"
-                        />
-                      </Col>
-                      <Col md={3}>
-                        <Form.Control
-                          type="text"
-                          value={this.state.newRoom}
-                          onChange={this.handleSubjectRoomChange}
-                          placeholder="Room"
-                        />
-                      </Col>
-                      {/* ปุ่มเลือกอวตารในฟอร์มแก้ไข */}
-                      <Col md={3}>
-                        <Button
-                          variant="info"
-                          onClick={() =>
-                            this.setState({ showSubjectAvatarModal: true })
-                          }
-                          className="mb-2"
-                        >
-                          Select Avatar
-                        </Button>
-                        {this.state.newPhoto && (
-                          <img
-                            src={this.state.newPhoto}
-                            alt="Selected Avatar"
-                            style={{
-                              width: "60px",
-                              height: "60px",
-                              borderRadius: "50%",
-                              marginTop: "5px",
-                            }}
-                          />
-                        )}
-                      </Col>
-                      <Col md={3}>
-                        <Button
-                          variant="primary"
-                          onClick={this.updateSubject}
-                          className="w-100"
-                        >
-                          Update Subject
-                        </Button>
-                      </Col>
-                    </Row>
-                  </div>
-                )}
-                {/* ตารางแสดงรายวิชา */}
                 <SubjectTable
                   subjects={this.state.subjects}
                   onDelete={this.deleteSubject}
@@ -460,6 +394,17 @@ class App extends React.Component {
               })
             }
             onClose={() => this.setState({ showSubjectAvatarModal: false })}
+          />
+        )}
+        {/* Modal สำหรับแก้ไขวิชา */}
+        {this.state.showEditSubjectModal && (
+          <EditSubjectModal
+            show={this.state.showEditSubjectModal}
+            subject={this.state.subjectToEdit}
+            newPhoto={this.state.newPhoto}
+            onChangePhoto={(photo) => this.setState({ newPhoto: photo })}
+            onSave={this.handleUpdateSubject}
+            onClose={this.handleCloseEditSubjectModal}
           />
         )}
       </Container>
@@ -611,6 +556,112 @@ function SubjectAvatarSelector({ show, onSelect, onClose, currentAvatar }) {
       <Modal.Footer>
         <Button variant="secondary" onClick={onClose}>
           Close
+        </Button>
+      </Modal.Footer>
+    </Modal>
+  );
+}
+
+// Component: EditSubjectModal (Modal สำหรับแก้ไขวิชา)
+function EditSubjectModal({
+  show,
+  subject,
+  newPhoto,
+  onChangePhoto,
+  onSave,
+  onClose,
+}) {
+  const [name, setName] = React.useState(subject ? subject.name : "");
+  const [code, setCode] = React.useState(subject ? subject.code : "");
+  const [room, setRoom] = React.useState(subject ? subject.room : "");
+  const [avatar, setAvatar] = React.useState(newPhoto || subject.photo || "");
+  const [showAvatarModal, setShowAvatarModal] = React.useState(false);
+
+  React.useEffect(() => {
+    if (subject) {
+      setName(subject.name);
+      setCode(subject.code);
+      setRoom(subject.room);
+      setAvatar(newPhoto || subject.photo || "");
+    }
+  }, [subject, newPhoto, show]);
+
+  const handleSave = () => {
+    if (name.trim() === "" || code.trim() === "") {
+      alert("Please enter both subject name and subject code.");
+      return;
+    }
+    onSave({ name, code, room, photo: avatar });
+  };
+
+  return (
+    <Modal show={show} onHide={onClose} centered>
+      <Modal.Header closeButton>
+        <Modal.Title>Edit Subject</Modal.Title>
+      </Modal.Header>
+      <Modal.Body>
+        <Form>
+          <Form.Group className="mb-3">
+            <Form.Label>Subject Code</Form.Label>
+            <Form.Control
+              type="text"
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+              placeholder="Enter subject code"
+            />
+          </Form.Group>
+          <Form.Group className="mb-3">
+            <Form.Label>Subject Name</Form.Label>
+            <Form.Control
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Enter subject name"
+            />
+          </Form.Group>
+          <Form.Group className="mb-3">
+            <Form.Label>Room</Form.Label>
+            <Form.Control
+              type="text"
+              value={room}
+              onChange={(e) => setRoom(e.target.value)}
+              placeholder="Enter room"
+            />
+          </Form.Group>
+          <Form.Group className="mb-3">
+            <Button variant="info" onClick={() => setShowAvatarModal(true)}>
+              Select Avatar
+            </Button>
+            {avatar && (
+              <img
+                src={avatar}
+                alt="Selected Avatar"
+                style={{
+                  width: "60px",
+                  height: "60px",
+                  borderRadius: "50%",
+                  marginTop: "5px",
+                }}
+              />
+            )}
+          </Form.Group>
+        </Form>
+        {showAvatarModal && (
+          <SubjectAvatarSelector
+            show={showAvatarModal}
+            currentAvatar={avatar}
+            onSelect={(selectedAvatar) => {
+              setAvatar(selectedAvatar);
+              setShowAvatarModal(false);
+              onChangePhoto(selectedAvatar);
+            }}
+            onClose={() => setShowAvatarModal(false)}
+          />
+        )}
+      </Modal.Body>
+      <Modal.Footer>
+        <Button variant="primary" onClick={handleSave}>
+          Save Changes
         </Button>
       </Modal.Footer>
     </Modal>
