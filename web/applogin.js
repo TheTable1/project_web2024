@@ -593,6 +593,31 @@ function SubjectDetail({ subject, onBack, userId }) {
   ถาม-ตอบ
 </Button>
 
+const fetchStudentStatus = async (studentId) => {
+  try {
+    // Fetch the student's document from the students sub-collection
+    const studentDocRef = db
+      .collection("users")
+      .doc(userId) // Ensure userId is correctly set
+      .collection("classroom")
+      .doc(subject.id) // Ensure subject.id is set properly
+      .collection("students")
+      .doc(studentId);
+
+    const studentDoc = await studentDocRef.get();
+
+    if (studentDoc.exists) {
+      // Return the status field from the student's document
+      return studentDoc.data().status;
+    } else {
+      console.log("Student document does not exist.");
+      return null;
+    }
+  } catch (error) {
+    console.error("Error fetching student status:", error);
+    return null;
+  }
+};
 //----เชื่อมไปหน้าคำถาม---//
 
   // Toggle แสดงรายชื่อผู้เช็คชื่อแบบ Realtime
@@ -622,13 +647,24 @@ function SubjectDetail({ subject, onBack, userId }) {
         studentIds.map((id) => db.collection("users").doc(id).get())
       );
   
-      // Process the user data from the "users" collection
-      const studentsList = userDocs
-        .filter((doc) => doc.exists)
-        .map((doc) => ({ id: doc.id, ...doc.data() }));
+      // Fetch the status for each student and construct the students list
+      const studentsList = await Promise.all(
+        userDocs.map(async (doc) => {
+          if (doc.exists) {
+            // Fetch status for the student using their ID
+            const status = await fetchStudentStatus(doc.id); // Pass the student ID here
+            return { id: doc.id, ...doc.data(), status };
+          }
+        })
+      );
+  
+      // Filter out undefined entries (in case of errors)
+      const validStudents = studentsList.filter((student) => student !== undefined);
+  
+      console.log("Fetched students:", validStudents);
   
       // Update state with the fetched student data
-      setStudents(studentsList);
+      setStudents(validStudents);
       setShowStudentsList(true);
     } catch (error) {
       console.error("Error fetching students:", error);
@@ -781,14 +817,14 @@ function SubjectDetail({ subject, onBack, userId }) {
     try {
       const studentDocRef = db
         .collection("users")
-        .doc(student.id)
+        .doc(userId) // Ensure userId is defined properly
         .collection("classroom")
-        .doc(subject.id)
+        .doc(subject.id) // Ensure subject.id is correct
         .collection("students")
-        .doc(student.id);
-      
-      // Check if the student document exists
+        .doc(student.id); // Ensure student.id is valid
+
       const studentDoc = await studentDocRef.get();
+      
       if (!studentDoc.exists) {
         console.log("Student document does not exist.");
         return;
@@ -798,13 +834,6 @@ function SubjectDetail({ subject, onBack, userId }) {
       await studentDocRef.update({
         status: 1 // Change the status to 1 (Accepted)
       });
-
-      // Optionally, update the local state to re-render with updated status
-      setStudents((prevStudents) =>
-        prevStudents.map((s) =>
-          s.id === student.id ? { ...s, status: 1 } : s
-        )
-      );
 
       console.log("Student accepted:", student.id);
     } catch (error) {
