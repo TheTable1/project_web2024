@@ -3,13 +3,13 @@ const { Alert, Card, Button, Table, Form, Modal, Container, Row, Col } =
 
 // Firebase Configuration
 const firebaseConfig = {
-  apiKey: "AIzaSyDpyi2trOVCMFZfTRTClLUSv9urSqFpmLA",
-  authDomain: "projectweb-150fc.firebaseapp.com",
-  projectId: "projectweb-150fc",
-  storageBucket: "projectweb-150fc.firebasestorage.app",
-  messagingSenderId: "148917915697",
-  appId: "1:148917915697:web:93234e5ae2e53293320510",
-  measurementId: "G-NXDX5YSHDE",
+  apiKey: "AIzaSyDrjydWmT19vEJu6zvsJCZk-iLg5P9G_9c",
+  authDomain: "web2567teungteung.firebaseapp.com",
+  projectId: "web2567teungteung",
+  storageBucket: "web2567teungteung.firebasestorage.app",
+  messagingSenderId: "472898800755",
+  appId: "1:472898800755:web:b861572160a6ca34a4ae06",
+  measurementId: "G-LVKQEQ5Z67"
 };
 
 // Initialize Firebase (compat version)
@@ -28,6 +28,8 @@ class App extends React.Component {
       user: null,
       subjects: [],
       classroom: [],
+
+      loginuser: null,
       newSubject: "",
       newSubjectCode: "",
       newRoom: "",
@@ -38,7 +40,8 @@ class App extends React.Component {
       subjectToEdit: null,
       showSubjects: false,
       showClassroom: false,
-      selectedClassroom: null, // state สำหรับเก็บวิชาที่เลือกใน Classroom view
+      selectedClassroom: null,
+      // state สำหรับเก็บวิชาที่เลือกใน Classroom view
     };
   }
 
@@ -63,11 +66,26 @@ class App extends React.Component {
         this.setState({ user: user.toJSON() }, () => {
           this.loadSubjects();
         });
+
+        // Fetch additional user data from Firestore
+        db.collection("users").doc(user.uid).get()
+          .then((doc) => {
+            if (doc.exists) {
+              const userData = doc.data();
+              this.setState({ loginuser: userData });
+              console.log("Userlogin Data:", this.state.loginuser);
+            } else {
+              console.log("No user data found in Firestore.");
+            }
+          })
+          .catch(error => console.error("Error fetching user data:", error));
+
       } else {
-        this.setState({ user: null });
+        this.setState({ user: null, loginuser: null });
       }
     });
   }
+
 
   // โหลดข้อมูลรายวิชา จาก path /users/{user.uid}/classroom
   loadSubjects = async () => {
@@ -236,6 +254,7 @@ class App extends React.Component {
                 email: user.email,
                 photo: user.photoURL,
                 phone: "",
+                status: 2,
                 room: [],
                 createdAt: firebase.firestore.FieldValue.serverTimestamp(),
               });
@@ -264,16 +283,18 @@ class App extends React.Component {
                 className="mt-2"
                 onClick={this.toggleSubjects}
               >
-                <i className="bi bi-pencil-square me-2"></i> Subject
+                <i className="bi bi-pencil-square me-2"></i>Manage Classroom
               </Button>
               <Button
                 variant="success"
                 className="mt-2 ms-3"
                 onClick={this.toggleClassroom}
               >
-                <i className="bi bi-pencil-square me-2"></i> Classroom
+                <i className="bi bi-pencil-square me-2"></i> Classroom List
               </Button>
+
             </div>
+
 
             {this.state.user && this.state.showSubjects && (
               <div className="mt-4">
@@ -313,7 +334,7 @@ class App extends React.Component {
                       onClick={this.addSubject}
                       className="w-100"
                     >
-                      Add Subject
+                      Add Classroom
                     </Button>
                   </Col>
                 </Row>
@@ -395,18 +416,18 @@ function SubjectTable({ subjects, onDelete, onEdit }) {
     <Table striped bordered hover responsive className="mt-4">
       <thead className="table-dark">
         <tr>
-          <th>Subject Code</th>
-          <th>Subject Name</th>
           <th>Room</th>
+          <th>Subject Name</th>
+          <th>Subject Code</th>
           <th>Actions</th>
         </tr>
       </thead>
       <tbody>
         {subjects.map((subject) => (
           <tr key={subject.id}>
-            <td>{subject.code}</td>
+            <td>{subject.room}</td>
             <td>{subject.name}</td>
-            <td>{subject.room || "-"}</td>
+            <td>{subject.code || "-"}</td>
             <td>
               <Button
                 variant="warning"
@@ -478,6 +499,25 @@ function ClassroomDetail({ subject, onBack }) {
             <strong>Subject Code:</strong> {subject.code} <br />
             <strong>Room:</strong> {subject.room || "-"}
           </Card.Text>
+
+          <Table>
+            <thead>
+              <tr>
+                <th>Student Id</th>
+                <th>Student Name</th>
+                <th>Student Email</th>
+              </tr>
+            </thead>
+            <tbody>
+              {subject.students?.map((student, index) => (
+                <tr key={index}>
+                  <td>{student.name}</td>
+                  <td>{student.email}</td>
+                </tr>
+              ))}
+            </tbody>
+          </Table>
+
         </Card.Body>
       </Card>
     </div>
@@ -490,6 +530,7 @@ function LoginBox({ user, app }) {
   const [name, setName] = React.useState("");
   const [email, setEmail] = React.useState("");
   const [phone, setPhone] = React.useState("");
+  const [status, setStatus] = React.useState("");
 
   React.useEffect(() => {
     if (user) {
@@ -500,6 +541,7 @@ function LoginBox({ user, app }) {
           setName(data.name || "");
           setEmail(data.email || "");
           setPhone(data.phone || "");
+          setStatus(data.status || "");
         }
       });
     }
@@ -507,12 +549,18 @@ function LoginBox({ user, app }) {
 
   React.useEffect(() => {
     if (user) {
-      const userRef = db.collection("users").doc(user.uid);
-      userRef.get().then((doc) => {
-        if (doc.exists) {
-          setUserData(doc.data());
-        }
-      });
+      db.collection("users").doc(user.uid).get()
+        .then((doc) => {
+          if (doc.exists) {
+            const userData = doc.data();
+            setUserData({
+              ...userData
+            });
+          } else {
+            console.log("No user data found in Firestore.");
+          }
+        })
+        .catch(error => console.error("Error fetching user data:", error));
     }
   }, [user]);
 
@@ -549,6 +597,13 @@ function LoginBox({ user, app }) {
       <h4 className="mt-4 text-dark">{userData?.name || "No Name"}</h4>
       <p className="text-muted mb-1">{userData?.email || "No Email"}</p>
       <p className="text-muted pt-0">{userData?.phone || "No Phone"}</p>
+      <p className="text-muted pt-0">
+        {userData?.status === 1
+          ? "Teacher"
+          : userData?.status === 2
+            ? "Student"
+            : "Person"}
+      </p>
       <div>
         <EditProfileButton
           userId={user.uid}
@@ -556,15 +611,31 @@ function LoginBox({ user, app }) {
           currentEmail={email}
           currentPhone={phone}
         />
+
       </div>
-      <Button
-        onClick={app.google_logout}
-        variant="secondary"
-        className="ms-auto px-4 py-2"
-      >
-        <i className="bi bi-box-arrow-right me-2" style={{ color: "gray" }}></i>{" "}
-        Logout
-      </Button>
+
+      <div >
+  {userData?.status === 2 && (
+    <Button
+      variant="success"
+      className="px-4 py-2"
+      onClick
+    >
+      <i className="bi bi-pencil-square me-2"></i>Join Classroom
+    </Button>
+  )}
+
+  <Button
+    onClick={app.google_logout}
+    variant="secondary"
+    className="px-4 py-2"
+  >
+    <i className="bi bi-box-arrow-right me-2" style={{ color: "gray" }}></i>{" "}
+    Logout
+  </Button>
+</div>
+
+
     </Card>
   );
 }
