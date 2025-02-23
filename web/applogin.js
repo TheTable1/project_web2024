@@ -246,12 +246,13 @@ class App extends React.Component {
       auth.signOut();
     }
   };
-
+//------1-----///
   render() {
     return (
-      <Container className="mt-4">
+      <Container className="mt-4 p-4 rounded-3 shadow-lg" style={{ background: "#e0e0e0", minHeight: "100vh" }}>
+
         <Card className="shadow-sm">
-          <Card.Body>
+          <Card.Body> 
             <LoginBox user={this.state.user} app={this} />
             <div >
             <Button variant="success" className="mt-2" onClick={this.toggleSubjects}><i className="bi bi-pencil-square me-2">
@@ -264,7 +265,9 @@ class App extends React.Component {
             
             {this.state.user && this.state.showSubjects && (
               <div className="mt-4">
-                <h3 className="text-primary mb-3">Manage Subjects</h3>
+
+                <h3 className="mb-3" style={{ color: "black" }}>Manage Subjects</h3>
+
                 {/* ฟอร์มสำหรับเพิ่มวิชาใหม่ */}
                 <Row className="mb-3">
                   <Col md={3}>
@@ -361,6 +364,7 @@ class App extends React.Component {
   }
 }
 
+//-------2----------///
 // Component: SubjectTable
 function SubjectTable({ subjects, onDelete, onEdit }) {
   return (
@@ -547,81 +551,89 @@ function EditProfileButton({
 
   return (
     <>
-      <Button
-        variant="warning"
-        className=""
-        onClick={() => setShowModal(true)}
-      >
-        <i className="bi bi-pencil-square me-2"></i> Edit Profile
-      </Button>
+<Button
+  variant="light"
+  className="px-3 py-2 fw-bold rounded-pill shadow-sm border-0 text-dark position-absolute top-0 start-0 m-3"
+  style={{ backgroundColor: "#c7c7c7" }}
+  onClick={() => setShowModal(true)}
+>
+  <i className="bi bi-pencil-square me-2"></i> Edit Profile
+</Button>
 
-      <Modal show={showModal} onHide={() => setShowModal(false)} centered>
-        <Modal.Header closeButton>
-          <Modal.Title>Edit Profile</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <Form>
-            <Form.Group className="mb-3">
-              <Form.Label>Name:</Form.Label>
-              <Form.Control
-                type="text"
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-                placeholder="Enter your name"
-              />
-            </Form.Group>
-            <Form.Group className="mb-3">
-              <Form.Label>Email:</Form.Label>
-              <Form.Control
-                type="email"
-                value={newEmail}
-                onChange={(e) => setNewEmail(e.target.value)}
-                placeholder="Enter your email"
-              />
-            </Form.Group>
-            <Form.Group className="mb-3">
-              <Form.Label>Phone:</Form.Label>
-              <Form.Control
-                type="text"
-                value={newPhone}
-                onChange={(e) => setNewPhone(e.target.value)}
-                placeholder="Enter your phone number"
-              />
-            </Form.Group>
-            <Form.Group className="mb-3">
-              <Form.Label>Select Default Profile Picture:</Form.Label>
-              <div className="d-flex flex-wrap">
-                {defaultImages.map((imgUrl, index) => (
-                  <img
-                    key={index}
-                    src={imgUrl}
-                    alt={`Default ${index}`}
-                    style={{
-                      width: "60px",
-                      height: "60px",
-                      objectFit: "cover",
-                      cursor: "pointer",
-                      border:
-                        newProfilePicture === imgUrl
-                          ? "3px solid #007bff"
-                          : "1px solid #ccc",
-                      borderRadius: "50%",
-                      marginRight: "10px",
-                      marginBottom: "10px",
-                    }}
-                    onClick={() => setNewProfilePicture(imgUrl)}
-                  />
-                ))}
-              </div>
-            </Form.Group>
-          </Form>
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="success" onClick={handleSave}>
-            Save Changes
-          </Button>
-        </Modal.Footer>
-      </Modal>
+<Modal show={showModal} onHide={() => setShowModal(false)} centered>
+  <Modal.Header closeButton className="bg-transparent border-0">
+    <Modal.Title className="fw-bold text-dark">Edit Profile</Modal.Title>
+  </Modal.Header>
+  <Modal.Body className="p-4 rounded border-0" style={{
+    background: "#f8f9fa",
+    color: "#333",
+    boxShadow: "none"
+  }}>
+    <Form>
+      <Form.Group className="mb-3">
+        <Form.Label className="fw-semibold">Name:</Form.Label>
+        <Form.Control
+          type="text"
+          value={newName}
+          onChange={(e) => setNewName(e.target.value)}
+          placeholder="Enter your name"
+          className="shadow-sm border-0 rounded-3 px-3 py-2"
+        />
+      </Form.Group>
+      <Form.Group className="mb-3">
+        <Form.Label className="fw-semibold">Email:</Form.Label>
+        <Form.Control
+          type="email"
+          value={newEmail}
+          onChange={(e) => setNewEmail(e.target.value)}
+          placeholder="Enter your email"
+          className="shadow-sm border-0 rounded-3 px-3 py-2"
+        />
+      </Form.Group>
+      <Form.Group className="mb-3">
+        <Form.Label className="fw-semibold">Phone:</Form.Label>
+        <Form.Control
+          type="text"
+          value={newPhone}
+          onChange={(e) => setNewPhone(e.target.value)}
+          placeholder="Enter your phone number"
+          className="shadow-sm border-0 rounded-3 px-3 py-2"
+        />
+      </Form.Group>
+      <Form.Group className="mb-3">
+        <Form.Label className="fw-semibold">Select Default Profile Picture:</Form.Label>
+        <div className="d-flex flex-wrap justify-content-center">
+          {defaultImages.map((imgUrl, index) => (
+            <img
+              key={index}
+              src={imgUrl}
+              alt={`Default ${index}`}
+              className="rounded-circle border border-light shadow-sm mx-2"
+              style={{
+                width: "75px",
+                height: "75px",
+                objectFit: "cover",
+                cursor: "pointer",
+                transition: "all 0.2s ease-in-out",
+                border: newProfilePicture === imgUrl ? "4px solid #007bff" : "2px solid #ddd",
+                boxShadow: "0px 6px 10px rgba(0, 0, 0, 0.15)",
+              }}
+              onMouseOver={(e) => (e.target.style.transform = "scale(1.15)")}
+              onMouseOut={(e) => (e.target.style.transform = "scale(1)")}
+              onClick={() => setNewProfilePicture(imgUrl)}
+            />
+          ))}
+        </div>
+      </Form.Group>
+    </Form>
+  </Modal.Body>
+  <Modal.Footer className="bg-transparent border-0">
+    <Button variant="success" onClick={handleSave} className="px-4 py-2 fw-bold rounded-pill shadow-sm" style={{ backgroundColor: "#c7c7c7", borderColor: "#c7c7c7", color: "#fff" }}>
+      Save Changes
+    </Button>
+  </Modal.Footer>
+</Modal>
+
     </>
   );
 }
