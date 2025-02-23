@@ -20,6 +20,22 @@ const db = firebase.firestore();
 const auth = firebase.auth();
 const storage = firebase.storage();
 
+// Component สำหรับสร้าง QR Code ด้วย QRCode.js
+function QRCodeComponent({ value, size }) {
+  const qrRef = React.useRef(null);
+  React.useEffect(() => {
+    if (qrRef.current) {
+      qrRef.current.innerHTML = "";
+      new QRCode(qrRef.current, {
+        text: value,
+        width: size,
+        height: size,
+      });
+    }
+  }, [value, size]);
+  return <div ref={qrRef}></div>;
+}
+
 // Main App Component
 class App extends React.Component {
   constructor(props) {
@@ -434,7 +450,6 @@ function SubjectTable({ subjects, onDelete, onEdit, onSelect }) {
               >
                 Delete
               </Button>
-              <i class="fa fa-xing" aria-hidden="true"></i>
             </td>
           </tr>
         ))}
@@ -590,7 +605,6 @@ function SubjectDetail({ subject, onBack, userId }) {
     }
   };
 
-
   // Toggle แสดงคะแนน (Realtime)
   const toggleScoresList = () => {
     if (!showScoresList) {
@@ -694,12 +708,9 @@ function SubjectDetail({ subject, onBack, userId }) {
           <Modal.Title>QR Code for {subject.name}</Modal.Title>
         </Modal.Header>
         <Modal.Body className="text-center">
-          <img
-            src={`https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(
-              detailURL
-            )}&size=200x200`}
-            alt="QR Code"
-          />
+          <div className="mx-auto" style={{ width: 200 }}>
+            <QRCodeComponent value={detailURL} size={200} />
+          </div>
           <p className="mt-2">Scan to view subject details</p>
         </Modal.Body>
         <Modal.Footer>
@@ -1003,7 +1014,6 @@ function EditSubjectModal({
     </Modal>
   );
 }
-
 
 // Component: LoginBox (แสดงข้อมูลผู้ใช้)
 function LoginBox({ user, app }) {
