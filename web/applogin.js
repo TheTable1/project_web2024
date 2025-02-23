@@ -3,13 +3,13 @@ const { Alert, Card, Button, Table, Form, Modal, Container, Row, Col } =
 
 // Firebase Configuration
 const firebaseConfig = {
-  apiKey: "AIzaSyDpyi2trOVCMFZfTRTClLUSv9urSqFpmLA",
-  authDomain: "projectweb-150fc.firebaseapp.com",
-  projectId: "projectweb-150fc",
-  storageBucket: "projectweb-150fc.firebasestorage.app",
-  messagingSenderId: "148917915697",
-  appId: "1:148917915697:web:93234e5ae2e53293320510",
-  measurementId: "G-NXDX5YSHDE",
+  apiKey: "AIzaSyDrjydWmT19vEJu6zvsJCZk-iLg5P9G_9c",
+  authDomain: "web2567teungteung.firebaseapp.com",
+  projectId: "web2567teungteung",
+  storageBucket: "web2567teungteung.firebasestorage.app",
+  messagingSenderId: "472898800755",
+  appId: "1:472898800755:web:b861572160a6ca34a4ae06",
+  measurementId: "G-LVKQEQ5Z67"
 };
 
 // Initialize Firebase (compat version)
@@ -567,26 +567,51 @@ function SubjectDetail({ subject, onBack, userId }) {
   };
 
   // Toggle แสดงรายชื่อผู้เช็คชื่อแบบ Realtime
-  const toggleStudentsList = () => {
-    if (!showStudentsList) {
-      const unsubscribe = db
+  const fetchStudents = async () => {
+    try {
+      const classroomRef = db
         .collection("users")
         .doc(userId)
         .collection("classroom")
-        .doc(subject.id)
-        .collection("checkin")
-        .doc(currentCheckinNo)
-        .collection("students")
-        .onSnapshot((snapshot) => {
-          const list = [];
-          snapshot.forEach((doc) => list.push({ id: doc.id, ...doc.data() }));
-          setStudents(list);
-        });
+        .doc(subject.id);
+  
+      const docSnapshot = await classroomRef.get();
+  
+      if (!docSnapshot.exists) {
+        console.log("Classroom document not found.");
+        setStudents([]);
+        return;
+      }
+  
+      const data = docSnapshot.data();
+      const studentUids = (data.students || []).map((ref) => ref.id);
+
+    
+      console.log("Student UIDs:", studentUids);
+
+      if (studentUids.length === 0) {
+        console.log("No students found.");
+        setStudents([]);
+        return;
+      }
+  
+      // Fetch all students' info from "users" collection in parallel
+      const userDocs = await Promise.all(
+        studentUids.map((uid) => db.collection("users").doc(uid).get())
+      );
+  
+      // Process the user data
+      const studentsList = userDocs
+        .filter((doc) => doc.exists)
+        .map((doc) => ({ id: doc.id, ...doc.data() }));
+  
+      setStudents(studentsList);
       setShowStudentsList(true);
-    } else {
-      setShowStudentsList(false);
+    } catch (error) {
+      console.error("Error fetching students:", error);
     }
   };
+  
 
   // Toggle แสดงคะแนน (Realtime)
   const toggleScoresList = () => {
@@ -668,7 +693,7 @@ function SubjectDetail({ subject, onBack, userId }) {
           <div className="mb-2">
             <Button
               variant="dark"
-              onClick={toggleStudentsList}
+              onClick={fetchStudents}
               className="me-2"
             >
               แสดงรายชื่อ
@@ -1011,23 +1036,34 @@ function LoginBox({ user, app }) {
   React.useEffect(() => {
     if (user) {
       const userRef = db.collection("users").doc(user.uid);
+
       userRef.get().then((doc) => {
         if (doc.exists) {
+          // If user already exists, load their data
           const data = doc.data();
           setName(data.name || "");
           setEmail(data.email || "");
           setPhone(data.phone || "");
-        }
-      });
-    }
-  }, [user]);
+          setUserData(data);
+        } else {
+          // If user doesn't exist, create a new document
+          const newUser = {
+            uid: user.uid,
+            name: user.displayName || "", // Use default name if available
+            email: user.email || "",
+            phone: "", // Empty by default
+            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+          };
 
-  React.useEffect(() => {
-    if (user) {
-      const userRef = db.collection("users").doc(user.uid);
-      userRef.get().then((doc) => {
-        if (doc.exists) {
-          setUserData(doc.data());
+          userRef.set(newUser)
+            .then(() => {
+              console.log("New user added to Firestore");
+              setUserData(newUser);
+              setName(newUser.name);
+              setEmail(newUser.email);
+              setPhone(newUser.phone);
+            })
+            .catch((error) => console.error("Error adding new user:", error));
         }
       });
     }
