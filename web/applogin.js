@@ -3,13 +3,13 @@ const { Alert, Card, Button, Table, Form, Modal, Container, Row, Col } =
 
 // Firebase Configuration
 const firebaseConfig = {
-  apiKey: "AIzaSyDpyi2trOVCMFZfTRTClLUSv9urSqFpmLA",
-  authDomain: "projectweb-150fc.firebaseapp.com",
-  projectId: "projectweb-150fc",
-  storageBucket: "projectweb-150fc.firebasestorage.app",
-  messagingSenderId: "148917915697",
-  appId: "1:148917915697:web:93234e5ae2e53293320510",
-  measurementId: "G-NXDX5YSHDE",
+  apiKey: "AIzaSyDrjydWmT19vEJu6zvsJCZk-iLg5P9G_9c",
+  authDomain: "web2567teungteung.firebaseapp.com",
+  projectId: "web2567teungteung",
+  storageBucket: "web2567teungteung.firebasestorage.app",
+  messagingSenderId: "472898800755",
+  appId: "1:472898800755:web:b861572160a6ca34a4ae06",
+  measurementId: "G-LVKQEQ5Z67"
 };
 
 // Initialize Firebase (compat version)
@@ -19,6 +19,22 @@ if (!firebase.apps.length) {
 const db = firebase.firestore();
 const auth = firebase.auth();
 const storage = firebase.storage();
+
+// Component สำหรับสร้าง QR Code ด้วย QRCode.js
+function QRCodeComponent({ value, size }) {
+  const qrRef = React.useRef(null);
+  React.useEffect(() => {
+    if (qrRef.current) {
+      qrRef.current.innerHTML = "";
+      new QRCode(qrRef.current, {
+        text: value,
+        width: size,
+        height: size,
+      });
+    }
+  }, [value, size]);
+  return <div ref={qrRef}></div>;
+}
 
 // Main App Component
 class App extends React.Component {
@@ -430,7 +446,7 @@ function SubjectTable({ subjects, onDelete, onEdit }) {
                 onClick={() => onDelete(subject.id)}
               >
                 Delete
-              </Button><i class="fa fa-xing" aria-hidden="true"></i>
+              </Button>
             </td>
           </tr>
         ))}
@@ -478,7 +494,7 @@ function SubjectDetail({ subject, onBack, userId }) {
   const [showScoresList, setShowScoresList] = React.useState(false);
 
   // สร้าง URL สำหรับรายละเอียดวิชา (ปรับเปลี่ยนได้ตามโปรเจค)
-  const detailURL = `https://yourwebsite.com/subject-details/${subject.id}`;
+  const detailURL = `${subject.id}`;
 
   // เปิดเช็คชื่อ: สร้างเอกสาร checkin ใหม่ใน path /classroom/{cid}/checkin/{cno}
   const openCheckin = async () => {
@@ -576,27 +592,82 @@ function SubjectDetail({ subject, onBack, userId }) {
 >
   ถาม-ตอบ
 </Button>
+
+const fetchStudentStatus = async (studentId) => {
+  try {
+    // Fetch the student's document from the students sub-collection
+    const studentDocRef = db
+      .collection("users")
+      .doc(userId) // Ensure userId is correctly set
+      .collection("classroom")
+      .doc(subject.id) // Ensure subject.id is set properly
+      .collection("students")
+      .doc(studentId);
+
+    const studentDoc = await studentDocRef.get();
+
+    if (studentDoc.exists) {
+      // Return the status field from the student's document
+      return studentDoc.data().status;
+    } else {
+      console.log("Student document does not exist.");
+      return null;
+    }
+  } catch (error) {
+    console.error("Error fetching student status:", error);
+    return null;
+  }
+};
 //----เชื่อมไปหน้าคำถาม---//
 
   // Toggle แสดงรายชื่อผู้เช็คชื่อแบบ Realtime
-  const toggleStudentsList = () => {
-    if (!showStudentsList) {
-      const unsubscribe = db
+  const fetchStudents = async () => {
+    try {
+      // Reference to the "students" collection in the classroom
+      const classroomRef = db
         .collection("users")
         .doc(userId)
         .collection("classroom")
         .doc(subject.id)
-        .collection("checkin")
-        .doc(currentCheckinNo)
-        .collection("students")
-        .onSnapshot((snapshot) => {
-          const list = [];
-          snapshot.forEach((doc) => list.push({ id: doc.id, ...doc.data() }));
-          setStudents(list);
-        });
+        .collection("students");
+  
+      const snapshot = await classroomRef.get(); // Get all students from the collection
+  
+      if (snapshot.empty) {
+        console.log("No students found.");
+        setStudents([]); // Clear the student list
+        return;
+      }
+  
+      // Extract student IDs from the snapshot
+      const studentIds = snapshot.docs.map((doc) => doc.id);
+  
+      // Fetch student data from the "users" collection based on the IDs
+      const userDocs = await Promise.all(
+        studentIds.map((id) => db.collection("users").doc(id).get())
+      );
+  
+      // Fetch the status for each student and construct the students list
+      const studentsList = await Promise.all(
+        userDocs.map(async (doc) => {
+          if (doc.exists) {
+            // Fetch status for the student using their ID
+            const status = await fetchStudentStatus(doc.id); // Pass the student ID here
+            return { id: doc.id, ...doc.data(), status };
+          }
+        })
+      );
+  
+      // Filter out undefined entries (in case of errors)
+      const validStudents = studentsList.filter((student) => student !== undefined);
+  
+      console.log("Fetched students:", validStudents);
+  
+      // Update state with the fetched student data
+      setStudents(validStudents);
       setShowStudentsList(true);
-    } else {
-      setShowStudentsList(false);
+    } catch (error) {
+      console.error("Error fetching students:", error);
     }
   };
 
@@ -608,17 +679,18 @@ function SubjectDetail({ subject, onBack, userId }) {
         .doc(userId)
         .collection("classroom")
         .doc(subject.id)
-        .collection("checkin")
-        .doc(currentCheckinNo)
         .collection("scores")
         .onSnapshot((snapshot) => {
           const list = [];
-          snapshot.forEach((doc) => list.push({ id: doc.id, ...doc.data() }));
+          snapshot.forEach((doc) => {
+            list.push({ id: doc.id, ...doc.data() });
+          });
           setScores(list);
         });
       setShowScoresList(true);
     } else {
       setShowScoresList(false);
+      setScores([]);
     }
   };
 
@@ -680,7 +752,7 @@ function SubjectDetail({ subject, onBack, userId }) {
           <div className="mb-2">
             <Button
               variant="dark"
-              onClick={toggleStudentsList}
+              onClick={fetchStudents}
               className="me-2"
             >
               แสดงรายชื่อ
@@ -702,12 +774,9 @@ function SubjectDetail({ subject, onBack, userId }) {
           <Modal.Title>QR Code for {subject.name}</Modal.Title>
         </Modal.Header>
         <Modal.Body className="text-center">
-          <img
-            src={`https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(
-              detailURL
-            )}&size=200x200`}
-            alt="QR Code"
-          />
+          <div className="mx-auto" style={{ width: 200 }}>
+            <QRCodeComponent value={detailURL} size={200} />
+          </div>
           <p className="mt-2">Scan to view subject details</p>
         </Modal.Body>
         <Modal.Footer>
@@ -719,57 +788,128 @@ function SubjectDetail({ subject, onBack, userId }) {
 
       {/* Students List Table */}
       {showStudentsList && (
-        <div className="mt-4">
-          <h5>รายชื่อผู้ที่เช็คชื่อ</h5>
-          <Table striped bordered hover responsive>
-            <thead className="table-dark">
-              <tr>
-                <th>ลำดับ</th>
-                <th>รหัส</th>
-                <th>ชื่อ</th>
-                <th>หมายเหตุ</th>
-                <th>วันเวลา</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {students.map((student, index) => (
-                <tr key={student.id}>
-                  <td>{index + 1}</td>
-                  <td>{student.code || "-"}</td>
-                  <td>{student.name || "-"}</td>
-                  <td>{student.note || "-"}</td>
-                  <td>
-                    {student.timestamp
-                      ? student.timestamp.toDate().toLocaleString()
-                      : "-"}
-                  </td>
-                  <td>
-                    <Button
-                      variant="danger"
-                      size="sm"
-                      onClick={async () => {
-                        await db
-                          .collection("users")
-                          .doc(userId)
-                          .collection("classroom")
-                          .doc(subject.id)
-                          .collection("checkin")
-                          .doc(currentCheckinNo)
-                          .collection("students")
-                          .doc(student.id)
-                          .delete();
-                      }}
-                    >
-                      Delete
-                    </Button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </Table>
-        </div>
-      )}
+  <div className="mt-4">
+    <h5>รายชื่อนักศึกษาในห้อง</h5>
+    <Table striped bordered hover responsive>
+      <thead className="table-dark">
+        <tr>
+          <th>ลำดับ</th>
+          <th>รหัส</th>
+          <th>ชื่อ</th>
+          <th>สถานะ</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+      {students.map((student, index) => (
+  <tr key={student.id}>
+    <td>{index + 1}</td>
+    <td>{student.stid || "-"}</td>
+    <td>{student.name || "-"}</td>
+    <td>{student.status}</td>
+    <td>
+      {student.status === 0 ? (
+  <>
+    <Button
+  variant="primary"
+  size="sm"
+  onClick={async () => {
+    try {
+      const studentDocRef = db
+        .collection("users")
+        .doc(userId) // Ensure userId is defined properly
+        .collection("classroom")
+        .doc(subject.id) // Ensure subject.id is correct
+        .collection("students")
+        .doc(student.id); // Ensure student.id is valid
+
+      const studentDoc = await studentDocRef.get();
+      
+      if (!studentDoc.exists) {
+        console.log("Student document does not exist.");
+        return;
+      }
+
+      // Update the student's status to 1 (Accepted)
+      await studentDocRef.update({
+        status: 1 // Change the status to 1 (Accepted)
+      });
+
+      console.log("Student accepted:", student.id);
+    } catch (error) {
+      console.error("Error accepting student:", error);
+    }
+  }}
+>
+  Accept
+</Button>
+    <Button
+      variant="danger"
+      size="sm"
+      onClick={async () => {
+        try {
+          // Remove the student from the sub-collection "students"
+          await db
+            .collection("users")
+            .doc(userId)
+            .collection("classroom")
+            .doc(subject.id)
+            .collection("students")
+            .doc(student.id)
+            .delete(); // Delete the student document from "students" collection
+
+          // Now remove the student from the local state to re-render the table
+          setStudents((prevStudents) =>
+            prevStudents.filter((s) => s.id !== student.id)
+          );
+
+          console.log("Student rejected and removed:", student.id);
+        } catch (error) {
+          console.error("Error rejecting student:", error);
+        }
+      }}
+    >
+      Reject
+    </Button>
+  </>
+) : (
+  <Button
+    variant="danger"
+    size="sm"
+    onClick={async () => {
+      try {
+        // Remove the student from the sub-collection "students"
+        await db
+          .collection("users")
+          .doc(userId)
+          .collection("classroom")
+          .doc(subject.id)
+          .collection("students")
+          .doc(student.id)
+          .delete(); // Delete the student document from "students" collection
+
+        // Now remove the student from the local state to re-render the table
+        setStudents((prevStudents) =>
+          prevStudents.filter((s) => s.id !== student.id)
+        );
+
+        console.log("Student rejected and removed:", student.id);
+      } catch (error) {
+        console.error("Error rejecting student:", error);
+      }
+    }}
+  >
+    Delete
+  </Button>
+)}
+    </td>
+  </tr>
+))}
+
+      </tbody>
+    </Table>
+  </div>
+)}
 
       {/* Scores List Table */}
       {showScoresList && (
@@ -917,7 +1057,7 @@ function EditSubjectModal({
   const [avatar, setAvatar] = React.useState("");
   const [showAvatarModal, setShowAvatarModal] = React.useState(false);
 
-  // เมื่อ modal เปิดขึ้นและมี subject ให้ pre-populate ค่าในฟอร์ม
+  // Pre-populate ข้อมูลเดิมเมื่อ Modal เปิดขึ้นและ subject มีค่า
   React.useEffect(() => {
     if (subject) {
       setName(subject.name || "");
@@ -1012,7 +1152,6 @@ function EditSubjectModal({
   );
 }
 
-
 // Component: LoginBox (แสดงข้อมูลผู้ใช้)
 function LoginBox({ user, app }) {
   const [userData, setUserData] = React.useState(null);
@@ -1023,23 +1162,34 @@ function LoginBox({ user, app }) {
   React.useEffect(() => {
     if (user) {
       const userRef = db.collection("users").doc(user.uid);
+
       userRef.get().then((doc) => {
         if (doc.exists) {
+          // If user already exists, load their data
           const data = doc.data();
           setName(data.name || "");
           setEmail(data.email || "");
           setPhone(data.phone || "");
-        }
-      });
-    }
-  }, [user]);
+          setUserData(data);
+        } else {
+          // If user doesn't exist, create a new document
+          const newUser = {
+            uid: user.uid,
+            name: user.displayName || "", // Use default name if available
+            email: user.email || "",
+            phone: "", // Empty by default
+            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+          };
 
-  React.useEffect(() => {
-    if (user) {
-      const userRef = db.collection("users").doc(user.uid);
-      userRef.get().then((doc) => {
-        if (doc.exists) {
-          setUserData(doc.data());
+          userRef.set(newUser)
+            .then(() => {
+              console.log("New user added to Firestore");
+              setUserData(newUser);
+              setName(newUser.name);
+              setEmail(newUser.email);
+              setPhone(newUser.phone);
+            })
+            .catch((error) => console.error("Error adding new user:", error));
         }
       });
     }
