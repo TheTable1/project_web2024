@@ -18,7 +18,7 @@ if (!firebase.apps.length) {
 }
 const db = firebase.firestore();
 const auth = firebase.auth();
-const storage = firebase.storage(); // ใช้งาน Firebase Storage (แต่ในส่วนนี้จะไม่ใช้สำหรับเปลี่ยนรูปโปรไฟล์)
+const storage = firebase.storage(); // ใช้งาน Firebase Storage
 
 // Main App Component
 class App extends React.Component {
@@ -38,8 +38,8 @@ class App extends React.Component {
       subjectToEdit: null,
       showSubjects: false,
       showClassroom: false,
+      selectedClassroom: null, // state สำหรับเก็บวิชาที่เลือกใน Classroom view
     };
-   
   }
 
   toggleSubjects = () => {
@@ -49,8 +49,13 @@ class App extends React.Component {
 
   toggleClassroom = () => {
     console.log("666666");
-    this.setState({ showClassroom: true, showSubjects: false });
-  }
+    // ตั้งค่า selectedClassroom ให้เป็น null เพื่อให้แสดงรายการวิชาทั้งหมด
+    this.setState({
+      showClassroom: true,
+      showSubjects: false,
+      selectedClassroom: null,
+    });
+  };
 
   componentDidMount() {
     auth.onAuthStateChanged((user) => {
@@ -68,47 +73,47 @@ class App extends React.Component {
   loadSubjects = async () => {
     const { user } = this.state;
     if (!user) return;
-  
+
     try {
-      const querySnapshot = await db.collection("users")
+      const querySnapshot = await db
+        .collection("users")
         .doc(user.uid)
         .collection("classroom")
         .get();
-  
+
       let subjects = [];
-  
+
       for (const classroomDoc of querySnapshot.docs) {
         const cid = classroomDoc.id; // Classroom ID
-  
-        // Fetch the 'info' document inside each classroom
-        const infoDoc = await db.collection("users")
+
+        // ดึงเอกสาร info ของแต่ละวิชา
+        const infoDoc = await db
+          .collection("users")
           .doc(user.uid)
           .collection("classroom")
           .doc(cid)
           .collection("info")
-          .doc("details") // Assuming the doc ID is "details"
+          .doc("details")
           .get();
-  
+
         if (infoDoc.exists) {
           subjects.push({
             id: cid,
             owner: user.uid,
-            ...infoDoc.data(), // Spread info data (code, name, photo, room)
+            ...infoDoc.data(), // รวมข้อมูลจาก details (code, name, photo, room)
           });
         } else {
-          console.warn(`No info found for classroom ${cid}`); // ⚠️ Debug Log
+          console.warn(`No info found for classroom ${cid}`);
         }
       }
-  
+
       this.setState({ subjects }, () => {
-        console.log("All Subjects Loaded:", this.state.subjects); // ✅ Debug Log
+        console.log("All Subjects Loaded:", this.state.subjects);
       });
-  
     } catch (error) {
       console.error("Error fetching subjects:", error);
     }
   };
-  
 
   // Handlers สำหรับ input ของวิชา
   handleSubjectChange = (event) => {
@@ -130,32 +135,33 @@ class App extends React.Component {
     db.collection("users")
       .doc(user.uid)
       .collection("classroom")
-      .add({ 
+      .add({
         owner: user.uid,
-        students : [],
+        students: [],
         checkin: [],
       })
-    .then((docRef) => {
-      return db.collection("users")
-      .doc(user.uid)
-      .collection("classroom")
-      .doc(docRef.id)
-      .collection("info")
-      .doc("details")
-      .set({
-        code: newSubjectCode,
-        name: newSubject,
-        photo: "",
-        room: newRoom,
-      });
-    })
-    .then(() => {
-      alert("Subject added successfully!");
-      this.setState({ newSubject: "", newSubjectCode: "", newRoom: "" });
-      this.loadSubjects();
-    })
-    .catch((error) => console.error("Error adding subject:", error));
-};
+      .then((docRef) => {
+        return db
+          .collection("users")
+          .doc(user.uid)
+          .collection("classroom")
+          .doc(docRef.id)
+          .collection("info")
+          .doc("details")
+          .set({
+            code: newSubjectCode,
+            name: newSubject,
+            photo: "",
+            room: newRoom,
+          });
+      })
+      .then(() => {
+        alert("Subject added successfully!");
+        this.setState({ newSubject: "", newSubjectCode: "", newRoom: "" });
+        this.loadSubjects();
+      })
+      .catch((error) => console.error("Error adding subject:", error));
+  };
 
   editSubject = (subject) => {
     this.setState({
@@ -222,7 +228,6 @@ class App extends React.Component {
         const user = result.user;
         if (user) {
           this.setState({ user: user.toJSON() });
-          // ตรวจสอบว่ามีเอกสารของผู้ใช้ใน Firestore หรือไม่ ถ้าไม่มีให้สร้างใหม่
           const userRef = db.collection("users").doc(user.uid);
           userRef.get().then((doc) => {
             if (!doc.exists) {
@@ -253,15 +258,23 @@ class App extends React.Component {
         <Card className="shadow-sm">
           <Card.Body>
             <LoginBox user={this.state.user} app={this} />
-            <div >
-            <Button variant="success" className="mt-2" onClick={this.toggleSubjects}><i className="bi bi-pencil-square me-2">
-        </i> Subject
-      </Button>
-      <Button variant="success" className="mt-2 ms-3" onClick={this.toggleClassroom}><i className="bi bi-pencil-square me-2">
-        </i> Classroom
-      </Button>
+            <div>
+              <Button
+                variant="success"
+                className="mt-2"
+                onClick={this.toggleSubjects}
+              >
+                <i className="bi bi-pencil-square me-2"></i> Subject
+              </Button>
+              <Button
+                variant="success"
+                className="mt-2 ms-3"
+                onClick={this.toggleClassroom}
+              >
+                <i className="bi bi-pencil-square me-2"></i> Classroom
+              </Button>
             </div>
-            
+
             {this.state.user && this.state.showSubjects && (
               <div className="mt-4">
                 <h3 className="text-primary mb-3">Manage Subjects</h3>
@@ -354,6 +367,21 @@ class App extends React.Component {
               </div>
             )}
 
+            {this.state.user &&
+              this.state.showClassroom &&
+              (this.state.selectedClassroom ? (
+                <ClassroomDetail
+                  subject={this.state.selectedClassroom}
+                  onBack={() => this.setState({ selectedClassroom: null })}
+                />
+              ) : (
+                <ClassroomList
+                  subjects={this.state.subjects}
+                  onSelect={(subject) =>
+                    this.setState({ selectedClassroom: subject })
+                  }
+                />
+              ))}
           </Card.Body>
         </Card>
       </Container>
@@ -403,7 +431,60 @@ function SubjectTable({ subjects, onDelete, onEdit }) {
   );
 }
 
-// Component: LoginBox (ดึงข้อมูลผู้ใช้จาก Firestore เพื่อแสดงข้อมูลโปรไฟล์)
+// Component: ClassroomList (แสดงรายการวิชาในรูปแบบการ์ด)
+function ClassroomList({ subjects, onSelect }) {
+  return (
+    <div className="mt-4">
+      <h3 className="text-primary mb-3">Classroom</h3>
+      <Row>
+        {subjects.map((subject) => (
+          <Col key={subject.id} md={4} className="mb-4">
+            <Card
+              onClick={() => onSelect(subject)}
+              style={{ cursor: "pointer" }}
+            >
+              <Card.Img
+                variant="top"
+                src={subject.photo || "/web/default-subject.jpg"}
+                style={{ height: "200px", objectFit: "cover" }}
+              />
+              <Card.Body>
+                <Card.Title>{subject.name}</Card.Title>
+              </Card.Body>
+            </Card>
+          </Col>
+        ))}
+      </Row>
+    </div>
+  );
+}
+
+// Component: ClassroomDetail (แสดงรายละเอียดของวิชา)
+function ClassroomDetail({ subject, onBack }) {
+  return (
+    <div className="mt-4">
+      <Button variant="secondary" onClick={onBack} className="mb-3">
+        Back
+      </Button>
+      <Card>
+        <Card.Img
+          variant="top"
+          src={subject.photo || "/default-subject.png"}
+          style={{ height: "300px", objectFit: "cover" }}
+        />
+        <Card.Body>
+          <Card.Title>{subject.name}</Card.Title>
+          <Card.Text>
+            <strong>Subject Code:</strong> {subject.code} <br />
+            <strong>Room:</strong> {subject.room || "-"}
+          </Card.Text>
+        </Card.Body>
+      </Card>
+    </div>
+  );
+}
+
+// Component: LoginBox (แสดงข้อมูลผู้ใช้)
 function LoginBox({ user, app }) {
   const [userData, setUserData] = React.useState(null);
   const [name, setName] = React.useState("");
@@ -461,14 +542,14 @@ function LoginBox({ user, app }) {
         <img
           src={userData?.photo || "/default-avatar.png"}
           alt="User Avatar"
-          className="rounded-circle border border-3 border-primary "
+          className="rounded-circle border border-3 border-primary"
           style={{ width: "130px", height: "130px", objectFit: "cover" }}
         />
       </div>
       <h4 className="mt-4 text-dark">{userData?.name || "No Name"}</h4>
       <p className="text-muted mb-1">{userData?.email || "No Email"}</p>
       <p className="text-muted pt-0">{userData?.phone || "No Phone"}</p>
-      <div className="">
+      <div>
         <EditProfileButton
           userId={user.uid}
           currentName={name}
@@ -488,7 +569,7 @@ function LoginBox({ user, app }) {
   );
 }
 
-// Component: EditProfileButton (เพิ่มฟีเจอร์เปลี่ยนรูปโปรไฟล์)
+// Component: EditProfileButton (แก้ไขข้อมูลโปรไฟล์)
 function EditProfileButton({
   userId,
   currentName,
@@ -499,7 +580,6 @@ function EditProfileButton({
   const [newName, setNewName] = React.useState(currentName);
   const [newEmail, setNewEmail] = React.useState(currentEmail);
   const [newPhone, setNewPhone] = React.useState(currentPhone);
-  // state สำหรับเก็บ URL รูปโปรไฟล์ที่เลือกจาก default images
   const [newProfilePicture, setNewProfilePicture] = React.useState(null);
 
   React.useEffect(() => {
@@ -515,7 +595,6 @@ function EditProfileButton({
       email: newEmail,
       phone: newPhone,
     };
-    // ถ้ามีการเลือก default image ให้บันทึก URL รูปที่เลือกไว้
     if (newProfilePicture) {
       updateData.photo = newProfilePicture;
     }
@@ -529,7 +608,6 @@ function EditProfileButton({
       .catch((error) => console.error("Error updating profile:", error));
   };
 
-  // รายการ default images ที่ให้เลือก (แก้ไขเป็น URL ที่ต้องการได้)
   const defaultImages = [
     "/web/default-avatar.jpg",
     "/web/default-avatar1.jpg",
@@ -547,11 +625,7 @@ function EditProfileButton({
 
   return (
     <>
-      <Button
-        variant="warning"
-        className=""
-        onClick={() => setShowModal(true)}
-      >
+      <Button variant="warning" onClick={() => setShowModal(true)}>
         <i className="bi bi-pencil-square me-2"></i> Edit Profile
       </Button>
 
