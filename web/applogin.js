@@ -301,67 +301,76 @@ class App extends React.Component {
                 <h3 className="mb-3" style={{ color: "black" }}>Manage Subjects</h3>
 
                 {/* ฟอร์มสำหรับเพิ่มวิชาใหม่ */}
-                <Row className="mb-3">
-                  <Col md={3}>
-                    <Form.Control
-                      type="text"
-                      value={this.state.newSubjectCode}
-                      onChange={this.handleSubjectCodeChange}
-                      placeholder="Enter subject code"
-                      className="mb-2"
-                    />
-                  </Col>
-                  <Col md={3}>
-                    <Form.Control
-                      type="text"
-                      value={this.state.newSubject}
-                      onChange={this.handleSubjectChange}
-                      placeholder="Enter subject name"
-                      className="mb-2"
-                    />
-                  </Col>
-                  <Col md={3}>
-                    <Form.Control
-                      type="text"
-                      value={this.state.newRoom}
-                      onChange={this.handleSubjectRoomChange}
-                      placeholder="Enter room"
-                      className="mb-2"
-                    />
-                  </Col>
-                  <Col md={3}>
-                    <Button
-                      variant="info"
-                      onClick={() =>
-                        this.setState({ showSubjectAvatarModal: true })
-                      }
-                      className="mb-2"
-                    >
-                      Select Avatar
-                    </Button>
-                    {this.state.newPhoto && (
-                      <img
-                        src={this.state.newPhoto}
-                        alt="Selected Avatar"
-                        style={{
-                          width: "60px",
-                          height: "60px",
-                          borderRadius: "50%",
-                          marginTop: "5px",
-                        }}
-                      />
-                    )}
-                  </Col>
-                  <Col md={3}>
-                    <Button
-                      variant="success"
-                      onClick={this.addSubject}
-                      className="w-100"
-                    >
-                      Add Subject
-                    </Button>
-                  </Col>
-                </Row>
+                <Row className="mb-3 align-items-center">
+  <Col md={3}>
+    <Form.Control
+      type="text"
+      value={this.state.newSubjectCode}
+      onChange={this.handleSubjectCodeChange}
+      placeholder="Enter subject code"
+      className="mb-2"
+    />
+  </Col>
+  <Col md={3}>
+    <Form.Control
+      type="text"
+      value={this.state.newSubject}
+      onChange={this.handleSubjectChange}
+      placeholder="Enter subject name"
+      className="mb-2"
+    />
+  </Col>
+  <Col md={3}>
+    <Form.Control
+      type="text"
+      value={this.state.newRoom}
+      onChange={this.handleSubjectRoomChange}
+      placeholder="Enter room"
+      className="mb-2"
+    />
+  </Col>
+  <Col md={3} className="d-flex align-items-center">
+    {/* ปุ่ม Select Avatar */}
+    <Button
+      className="fw-bold shadow-sm me-2"
+      style={{
+        backgroundColor: "#6c757d", // สีเทา
+        borderColor: "#5a6268",
+        color: "#ffffff",
+      }}
+      onClick={() => this.setState({ showSubjectAvatarModal: true })}
+    >
+      Select Avatar
+    </Button>
+    {this.state.newPhoto && (
+      <img
+        src={this.state.newPhoto}
+        alt="Selected Avatar"
+        style={{
+          width: "50px",
+          height: "50px",
+          borderRadius: "50%",
+          border: "2px solid #5a6268",
+        }}
+      />
+    )}
+  </Col>
+  
+  <Col md={3}>
+    {/* ปุ่ม Add Subject ให้อยู่ระดับเดียวกับ Select Avatar */}
+    <Button
+      className="fw-bold shadow-sm w-100"
+      style={{
+        backgroundColor: "#6c757d", // สีเทา
+        borderColor: "#5a6268",
+        color: "#ffffff",
+      }}
+      onClick={this.addSubject}
+    >
+      Add Subject
+    </Button>
+  </Col>
+</Row>
                 <SubjectTable
                   subjects={subjects}
                   onDelete={this.deleteSubject}
@@ -1112,9 +1121,9 @@ function EditSubjectModal({
             />
           </Form.Group>
           <Form.Group className="mb-3">
-            <Button variant="info" onClick={() => setShowAvatarModal(true)}>
-              Select Avatar
-            </Button>
+          <Button variant="success" className="px-3 fw-bold shadow-sm" style={{ backgroundColor: "#2ecc71", borderColor: "#27ae60" }}>
+  Select Avatar
+</Button>
             {avatar && (
               <img
                 src={avatar}
