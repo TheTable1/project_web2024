@@ -286,12 +286,14 @@ class App extends React.Component {
           <Card.Body> 
             <LoginBox user={this.state.user} app={this} />
             <div >
-            <Button variant="success" className="mt-2" onClick={this.toggleSubjects}><i className="bi bi-pencil-square me-2">
-        </i> Subject
-      </Button>
-      <Button variant="success" className="mt-2 ms-3" onClick={this.toggleClassroom}><i className="bi bi-pencil-square me-2">
-        </i> Classroom
-      </Button>
+
+            <Button style={{ backgroundColor: "#6c757d", borderColor: "#6c757d" }} className="text-white mt-2" onClick={this.toggleSubjects}>
+  <i className="bi bi-pencil-square me-2"></i> Subject
+</Button>
+<Button style={{ backgroundColor: "#6c757d", borderColor: "#6c757d" }} className="text-white mt-2 ms-3" onClick={this.toggleClassroom}>
+  <i className="bi bi-pencil-square me-2"></i> Classroom
+</Button>
+
             </div>
             {user && showSubjects && (
               <div className="mt-4">
@@ -416,8 +418,8 @@ class App extends React.Component {
 // Component: SubjectTable
 function SubjectTable({ subjects, onDelete, onEdit }) {
   return (
-    <Table striped bordered hover responsive className="mt-4">
-      <thead className="table-dark">
+    <Table striped bordered hover responsive className="mt-4 shadow-sm">
+  <thead className="table-primary text-white text-center">
         <tr>
           <th>Subject Code</th>
           <th>Subject Name</th>
