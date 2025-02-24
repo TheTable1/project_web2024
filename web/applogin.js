@@ -36,6 +36,174 @@ function QRCodeComponent({ value, size }) {
   return <div ref={qrRef}></div>;
 }
 
+// QAModal Component สำหรับตั้งคำถามและแสดงคำตอบแบบ Realtime
+function QAModal({ show, onClose, subject, userId, currentCheckinNo }) {
+  const [questionNo, setQuestionNo] = React.useState("");
+  const [questionText, setQuestionText] = React.useState("");
+  const [answers, setAnswers] = React.useState([]);
+  const [unsubscribeAnswers, setUnsubscribeAnswers] = React.useState(null);
+
+  // เมื่อ modal ปิด ให้เคลียร์ข้อมูลและยกเลิก listener ถ้ามี
+  React.useEffect(() => {
+    if (!show) {
+      setQuestionNo("");
+      setQuestionText("");
+      setAnswers([]);
+      if (unsubscribeAnswers) {
+        unsubscribeAnswers();
+        setUnsubscribeAnswers(null);
+      }
+    }
+  }, [show]);
+
+  const startQuestion = () => {
+    if (!currentCheckinNo) {
+      alert("กรุณาเปิดเช็คชื่อก่อนที่จะตั้งคำถาม");
+      return;
+    }
+    if (!questionNo || !questionText) {
+      alert("กรุณากรอกข้อมูลให้ครบถ้วน");
+      return;
+    }
+    auth.onAuthStateChanged((user) => {
+      if (!user) {
+        alert("กรุณาเข้าสู่ระบบก่อน");
+        return;
+      }
+      const uid = user.uid;
+      db.collection("users")
+        .doc(uid)
+        .collection("classroom")
+        .doc(subject.id)
+        .collection("checkin")
+        .doc(currentCheckinNo)
+        .set(
+          {
+            question_no: questionNo,
+            question_text: questionText,
+            question_show: true,
+          },
+          { merge: true }
+        )
+        .then(() => {
+          alert("เริ่มถามคำถามสำเร็จ");
+          // เริ่มฟัง (Realtime) คำตอบจาก subcollection "answers" โดย filter ตาม question_no
+          const unsubscribe = db
+            .collection("users")
+            .doc(uid)
+            .collection("classroom")
+            .doc(subject.id)
+            .collection("checkin")
+            .doc(currentCheckinNo)
+            .collection("answers")
+            .where("question_no", "==", questionNo)
+            .onSnapshot((snapshot) => {
+              const ansList = [];
+              snapshot.forEach((doc) => {
+                ansList.push(doc.data());
+              });
+              setAnswers(ansList);
+            });
+          setUnsubscribeAnswers(() => unsubscribe);
+        })
+        .catch((error) => {
+          console.error("Error starting question:", error);
+          alert("เกิดข้อผิดพลาด: " + error.message);
+        });
+    });
+  };
+
+  const closeQuestion = () => {
+    if (!currentCheckinNo) {
+      alert("ไม่มีเช็คชื่อที่เปิดอยู่");
+      return;
+    }
+    auth.onAuthStateChanged((user) => {
+      if (!user) {
+        alert("กรุณาเข้าสู่ระบบก่อน");
+        return;
+      }
+      const uid = user.uid;
+      db.collection("users")
+        .doc(uid)
+        .collection("classroom")
+        .doc(subject.id)
+        .collection("checkin")
+        .doc(currentCheckinNo)
+        .set(
+          {
+            question_show: false,
+          },
+          { merge: true }
+        )
+        .then(() => {
+          alert("ปิดคำถามเรียบร้อย");
+          if (unsubscribeAnswers) {
+            unsubscribeAnswers();
+            setUnsubscribeAnswers(null);
+          }
+        })
+        .catch((error) => {
+          console.error("Error closing question:", error);
+          alert("เกิดข้อผิดพลาด: " + error.message);
+        });
+    });
+  };
+
+  return (
+    <Modal show={show} onHide={onClose} centered>
+      <Modal.Header closeButton>
+        <Modal.Title>ตั้งคำถามในห้องเรียน</Modal.Title>
+      </Modal.Header>
+      <Modal.Body>
+        <Form>
+          <Form.Group className="mb-3">
+            <Form.Label>หมายเลขคำถาม</Form.Label>
+            <Form.Control
+              type="number"
+              value={questionNo}
+              onChange={(e) => setQuestionNo(e.target.value)}
+              placeholder="กรอกหมายเลขคำถาม"
+            />
+          </Form.Group>
+          <Form.Group className="mb-3">
+            <Form.Label>ข้อความคำถาม</Form.Label>
+            <Form.Control
+              as="textarea"
+              rows={3}
+              value={questionText}
+              onChange={(e) => setQuestionText(e.target.value)}
+              placeholder="กรอกข้อความคำถาม"
+            />
+          </Form.Group>
+          <div className="d-flex justify-content-between">
+            <Button variant="success" onClick={startQuestion}>
+              เริ่มถาม
+            </Button>
+            <Button variant="danger" onClick={closeQuestion}>
+              ปิดคำถาม
+            </Button>
+          </div>
+          <hr />
+          <h5>คำตอบที่ได้รับ (Realtime)</h5>
+          {answers.length > 0 ? (
+            answers.map((ans, index) => (
+              <p key={index}>{ans.answer_text || "ไม่มีคำตอบ"}</p>
+            ))
+          ) : (
+            <p>ยังไม่มีคำตอบ</p>
+          )}
+        </Form>
+      </Modal.Body>
+      <Modal.Footer>
+        <Button variant="secondary" onClick={onClose}>
+          ปิด
+        </Button>
+      </Modal.Footer>
+    </Modal>
+  );
+}
+
 // Main App Component
 class App extends React.Component {
   constructor(props) {
@@ -121,7 +289,6 @@ class App extends React.Component {
     }
   };
 
-  // Handlers สำหรับฟอร์มเพิ่มวิชา
   handleSubjectChange = (e) => {
     this.setState({ newSubject: e.target.value });
   };
@@ -132,7 +299,6 @@ class App extends React.Component {
     this.setState({ newRoom: e.target.value });
   };
 
-  // เพิ่มวิชาใหม่ (ใช้ข้อมูลจากฟอร์ม Manage Subjects)
   addSubject = async () => {
     const { newSubject, newSubjectCode, newRoom, user, newPhoto } = this.state;
     if (newSubject.trim() === "" || newSubjectCode.trim() === "") {
@@ -164,7 +330,6 @@ class App extends React.Component {
           room: newRoom,
         });
       alert("Subject added successfully!");
-      // reset form (คงเป็นช่องว่าง)
       this.setState({
         newSubject: "",
         newSubjectCode: "",
@@ -177,11 +342,9 @@ class App extends React.Component {
     }
   };
 
-  // เมื่อกด Edit ในตารางวิชา จะเปิด Modal แก้ไข (โดยฟอร์มแก้ไขจะเริ่มต้นเป็นช่องว่าง)
   editSubject = (subject) => {
     this.setState({
       subjectToEdit: subject,
-      // ไม่ pre-populate ค่าในฟอร์ม Add Subject ให้คงว่างอยู่
       newPhoto: null,
       showEditSubjectModal: true,
     });
@@ -195,7 +358,6 @@ class App extends React.Component {
     });
   };
 
-  // ฟังก์ชันอัปเดตวิชา (จะได้รับข้อมูลจาก Modal แก้ไข)
   handleUpdateSubject = async (updated) => {
     const { subjectToEdit, user } = this.state;
     if (!subjectToEdit) return;
@@ -280,7 +442,10 @@ class App extends React.Component {
     const { user, subjects, showSubjects, showClassroom, selectedSubject } =
       this.state;
     return (
-      <Container className="mt-4">
+      <Container
+        className="mt-4 p-4 rounded-3 shadow-lg"
+        style={{ background: "#e0e0e0", minHeight: "100vh" }}
+      >
         <Card className="shadow-sm">
           <Card.Body>
             <LoginBox user={user} app={this} />
@@ -416,7 +581,7 @@ class App extends React.Component {
   }
 }
 
-// Component: SubjectTable (แสดงตารางวิชาใน Manage Subjects)
+// Component: SubjectTable
 function SubjectTable({ subjects, onDelete, onEdit, onSelect }) {
   return (
     <Table striped bordered hover responsive className="mt-4">
@@ -458,7 +623,7 @@ function SubjectTable({ subjects, onDelete, onEdit, onSelect }) {
   );
 }
 
-// Component: ClassroomList (แสดงวิชาในรูปแบบการ์ด)
+// Component: ClassroomList
 function ClassroomList({ subjects, onSelect }) {
   return (
     <div className="mt-4">
@@ -486,20 +651,22 @@ function ClassroomList({ subjects, onSelect }) {
   );
 }
 
-// Component: SubjectDetail (หน้ารายละเอียดวิชาพร้อมฟังก์ชันเช็คชื่อ)
+// Component: SubjectDetail
 function SubjectDetail({ subject, onBack, userId }) {
   const [showQRCodeModal, setShowQRCodeModal] = React.useState(false);
-  const [checkinStatus, setCheckinStatus] = React.useState(null); // "open" หรือ "closed"
+  const [checkinStatus, setCheckinStatus] = React.useState(null);
   const [currentCheckinNo, setCurrentCheckinNo] = React.useState("");
   const [students, setStudents] = React.useState([]);
   const [showStudentsList, setShowStudentsList] = React.useState(false);
   const [scores, setScores] = React.useState([]);
   const [showScoresList, setShowScoresList] = React.useState(false);
+  const [showQAModal, setShowQAModal] = React.useState(false);
+  const [showQuestionListModal, setShowQuestionListModal] =
+    React.useState(false);
+  const [questionList, setQuestionList] = React.useState([]);
 
-  // สร้าง URL สำหรับรายละเอียดวิชา (ปรับเปลี่ยนได้ตามโปรเจค)
   const detailURL = `https://yourwebsite.com/subject-details/${subject.id}`;
 
-  // เปิดเช็คชื่อ: สร้างเอกสาร checkin ใหม่ใน path /classroom/{cid}/checkin/{cno}
   const openCheckin = async () => {
     const cno = "checkin_" + Date.now();
     setCurrentCheckinNo(cno);
@@ -518,7 +685,6 @@ function SubjectDetail({ subject, onBack, userId }) {
     alert("เช็คชื่อเปิดแล้ว รหัส: " + cno);
   };
 
-  // ปิดเช็คชื่อ: อัปเดตสถานะเป็น closed
   const closeCheckin = async () => {
     if (!currentCheckinNo) {
       alert("ไม่มีการเช็คชื่อที่เปิดอยู่");
@@ -536,7 +702,6 @@ function SubjectDetail({ subject, onBack, userId }) {
     alert("เช็คชื่อปิดแล้ว");
   };
 
-  // บันทึกการเช็คชื่อ: คัดลอกข้อมูลจาก students ไป scores โดยเพิ่ม status = 1
   const saveCheckin = async () => {
     if (!currentCheckinNo) {
       alert("ไม่มีการเช็คชื่อที่เปิดอยู่");
@@ -568,7 +733,6 @@ function SubjectDetail({ subject, onBack, userId }) {
     alert("บันทึกการเช็คชื่อเรียบร้อย");
   };
 
-  // แสดงรหัสเช็คชื่อ
   const showCheckinCode = () => {
     if (!currentCheckinNo) {
       alert("ไม่มีการเช็คชื่อที่เปิดอยู่");
@@ -577,12 +741,6 @@ function SubjectDetail({ subject, onBack, userId }) {
     }
   };
 
-  // Q&A: ตัวอย่าง placeholder
-  const openQA = () => {
-    alert("เข้าหน้า ถาม-ตอบ");
-  };
-
-  // Toggle แสดงรายชื่อผู้เช็คชื่อแบบ Realtime
   const toggleStudentsList = () => {
     if (!showStudentsList) {
       const unsubscribe = db
@@ -605,7 +763,6 @@ function SubjectDetail({ subject, onBack, userId }) {
     }
   };
 
-  // Toggle แสดงคะแนน (Realtime)
   const toggleScoresList = () => {
     if (!showScoresList) {
       const unsubscribe = db
@@ -628,7 +785,6 @@ function SubjectDetail({ subject, onBack, userId }) {
     }
   };
 
-  // ฟังก์ชันอัปเดตคะแนน (แก้ไข input inline)
   const updateScoreEntry = async (entryId, updatedData) => {
     await db
       .collection("users")
@@ -640,6 +796,79 @@ function SubjectDetail({ subject, onBack, userId }) {
       .collection("scores")
       .doc(entryId)
       .update(updatedData);
+  };
+
+  // ฟังก์ชันสำหรับเปิด Q&A Modal สำหรับตั้งคำถาม
+  const openQAModal = () => {
+    if (!currentCheckinNo) {
+      alert("กรุณาเปิดเช็คชื่อตอนนี้ก่อนที่จะตั้งคำถาม");
+      return;
+    }
+    setShowQAModal(true);
+  };
+
+  // ฟังก์ชันสำหรับดึงรายการคำถามจากทุกการเช็คอินและเปิด modal ดูคำถาม
+  const openQuestionList = () => {
+    auth.onAuthStateChanged((user) => {
+      if (!user) {
+        alert("กรุณาเข้าสู่ระบบก่อน");
+        return;
+      }
+      const uid = user.uid;
+      db.collection("users")
+        .doc(uid)
+        .collection("classroom")
+        .doc(subject.id)
+        .collection("checkin")
+        .where("question_text", ">", "")
+        .get()
+        .then((snapshot) => {
+          const questions = [];
+          snapshot.forEach((doc) => {
+            questions.push({ id: doc.id, ...doc.data() });
+          });
+          setQuestionList(questions);
+          setShowQuestionListModal(true);
+        })
+        .catch((error) => {
+          console.error("Error fetching questions:", error);
+        });
+    });
+  };
+
+  // ฟังก์ชันสำหรับ toggle เปิด/ปิดคำถามในแต่ละรายการ
+  const toggleQuestionStatus = (q) => {
+    auth.onAuthStateChanged((user) => {
+      if (!user) {
+        alert("กรุณาเข้าสู่ระบบก่อน");
+        return;
+      }
+      const uid = user.uid;
+      db.collection("users")
+        .doc(uid)
+        .collection("classroom")
+        .doc(subject.id)
+        .collection("checkin")
+        .doc(q.id)
+        .update({ question_show: !q.question_show })
+        .then(() => {
+          alert("อัปเดตสถานะคำถามเรียบร้อย");
+          setQuestionList((prevList) =>
+            prevList.map((item) =>
+              item.id === q.id
+                ? { ...item, question_show: !q.question_show }
+                : item
+            )
+          );
+        })
+        .catch((error) => {
+          console.error("Error toggling question status", error);
+        });
+    });
+  };
+
+  const openQA = () => {
+    openQAModal();
   };
 
   return (
@@ -679,8 +908,11 @@ function SubjectDetail({ subject, onBack, userId }) {
             >
               แสดง QRCode วิชา
             </Button>
-            <Button variant="secondary" onClick={openQA} className="me-2">
+            <Button variant="secondary" onClick={openQAModal} className="me-2">
               ถาม-ตอบ
+            </Button>
+            <Button variant="info" onClick={openQuestionList} className="me-2">
+              ดูคำถาม
             </Button>
           </div>
           <div className="mb-2">
@@ -698,7 +930,6 @@ function SubjectDetail({ subject, onBack, userId }) {
         </Card.Body>
       </Card>
 
-      {/* QR Code Modal */}
       <Modal
         show={showQRCodeModal}
         onHide={() => setShowQRCodeModal(false)}
@@ -720,7 +951,6 @@ function SubjectDetail({ subject, onBack, userId }) {
         </Modal.Footer>
       </Modal>
 
-      {/* Students List Table */}
       {showStudentsList && (
         <div className="mt-4">
           <h5>รายชื่อผู้ที่เช็คชื่อ</h5>
@@ -774,7 +1004,6 @@ function SubjectDetail({ subject, onBack, userId }) {
         </div>
       )}
 
-      {/* Scores List Table */}
       {showScoresList && (
         <div className="mt-4">
           <h5>คะแนนผู้เช็คชื่อ</h5>
@@ -846,11 +1075,79 @@ function SubjectDetail({ subject, onBack, userId }) {
           </Table>
         </div>
       )}
+
+      {showQAModal && (
+        <QAModal
+          show={showQAModal}
+          onClose={() => setShowQAModal(false)}
+          subject={subject}
+          userId={userId}
+          currentCheckinNo={currentCheckinNo}
+        />
+      )}
+
+      {/* Modal สำหรับแสดงรายการคำถามจากทุกการเช็คอิน */}
+      <Modal
+        show={showQuestionListModal}
+        onHide={() => setShowQuestionListModal(false)}
+        centered
+        size="lg"
+      >
+        <Modal.Header closeButton>
+          <Modal.Title>รายการคำถามทั้งหมด</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <Table striped bordered hover responsive>
+            <thead className="table-dark">
+              <tr>
+                <th>Checkin ID</th>
+                <th>หมายเลขคำถาม</th>
+                <th>ข้อความคำถาม</th>
+                <th>แสดงคำถาม</th>
+                <th>วันที่ตั้ง</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {questionList.map((q) => (
+                <tr key={q.id}>
+                  <td>{q.id}</td>
+                  <td>{q.question_no || "-"}</td>
+                  <td>{q.question_text || "-"}</td>
+                  <td>{q.question_show ? "Yes" : "No"}</td>
+                  <td>
+                    {q.createdAt
+                      ? new Date(q.createdAt.seconds * 1000).toLocaleString()
+                      : "-"}
+                  </td>
+                  <td>
+                    <Button
+                      variant={q.question_show ? "warning" : "success"}
+                      size="sm"
+                      onClick={() => toggleQuestionStatus(q)}
+                    >
+                      {q.question_show ? "ปิดคำถาม" : "เปิดคำถาม"}
+                    </Button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </Table>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button
+            variant="secondary"
+            onClick={() => setShowQuestionListModal(false)}
+          >
+            Close
+          </Button>
+        </Modal.Footer>
+      </Modal>
     </div>
   );
 }
 
-// Component: SubjectAvatarSelector (Modal สำหรับเลือกรูปอวตารของวิชา)
+// Component: SubjectAvatarSelector
 function SubjectAvatarSelector({ show, onSelect, onClose, currentAvatar }) {
   const defaultAvatars = [
     "/web/default-subject.jpg",
@@ -905,7 +1202,7 @@ function SubjectAvatarSelector({ show, onSelect, onClose, currentAvatar }) {
   );
 }
 
-// Component: EditSubjectModal (Modal สำหรับแก้ไขวิชา โดยเริ่มต้นเป็นช่องว่าง)
+// Component: EditSubjectModal
 function EditSubjectModal({
   show,
   subject,
@@ -920,7 +1217,6 @@ function EditSubjectModal({
   const [avatar, setAvatar] = React.useState("");
   const [showAvatarModal, setShowAvatarModal] = React.useState(false);
 
-  // Pre-populate ข้อมูลเดิมเมื่อ Modal เปิดขึ้นและ subject มีค่า
   React.useEffect(() => {
     if (subject) {
       setName(subject.name || "");
@@ -1015,7 +1311,7 @@ function EditSubjectModal({
   );
 }
 
-// Component: LoginBox (แสดงข้อมูลผู้ใช้)
+// Component: LoginBox
 function LoginBox({ user, app }) {
   const [userData, setUserData] = React.useState(null);
   const [name, setName] = React.useState("");
@@ -1100,7 +1396,7 @@ function LoginBox({ user, app }) {
   );
 }
 
-// Component: EditProfileButton (แก้ไขข้อมูลโปรไฟล์)
+// Component: EditProfileButton
 function EditProfileButton({
   userId,
   currentName,
@@ -1156,63 +1452,80 @@ function EditProfileButton({
 
   return (
     <>
-      <Button variant="warning" onClick={() => setShowModal(true)}>
+      <Button
+        variant="light"
+        className="px-3 py-2 fw-bold rounded-pill shadow-sm border-0 text-dark position-absolute top-0 start-0 m-3"
+        style={{ backgroundColor: "#c7c7c7" }}
+        onClick={() => setShowModal(true)}
+      >
         <i className="bi bi-pencil-square me-2"></i> Edit Profile
       </Button>
       <Modal show={showModal} onHide={() => setShowModal(false)} centered>
-        <Modal.Header closeButton>
-          <Modal.Title>Edit Profile</Modal.Title>
+        <Modal.Header closeButton className="bg-transparent border-0">
+          <Modal.Title className="fw-bold text-dark">Edit Profile</Modal.Title>
         </Modal.Header>
-        <Modal.Body>
+        <Modal.Body
+          className="p-4 rounded border-0"
+          style={{ background: "#f8f9fa", color: "#333", boxShadow: "none" }}
+        >
           <Form>
             <Form.Group className="mb-3">
-              <Form.Label>Name:</Form.Label>
+              <Form.Label className="fw-semibold">Name:</Form.Label>
               <Form.Control
                 type="text"
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
                 placeholder="Enter your name"
+                className="shadow-sm border-0 rounded-3 px-3 py-2"
               />
             </Form.Group>
             <Form.Group className="mb-3">
-              <Form.Label>Email:</Form.Label>
+              <Form.Label className="fw-semibold">Email:</Form.Label>
               <Form.Control
                 type="email"
                 value={newEmail}
                 onChange={(e) => setNewEmail(e.target.value)}
                 placeholder="Enter your email"
+                className="shadow-sm border-0 rounded-3 px-3 py-2"
               />
             </Form.Group>
             <Form.Group className="mb-3">
-              <Form.Label>Phone:</Form.Label>
+              <Form.Label className="fw-semibold">Phone:</Form.Label>
               <Form.Control
                 type="text"
                 value={newPhone}
                 onChange={(e) => setNewPhone(e.target.value)}
                 placeholder="Enter your phone number"
+                className="shadow-sm border-0 rounded-3 px-3 py-2"
               />
             </Form.Group>
             <Form.Group className="mb-3">
-              <Form.Label>Select Default Profile Picture:</Form.Label>
-              <div className="d-flex flex-wrap">
+              <Form.Label className="fw-semibold">
+                Select Default Profile Picture:
+              </Form.Label>
+              <div className="d-flex flex-wrap justify-content-center">
                 {defaultImages.map((imgUrl, index) => (
                   <img
                     key={index}
                     src={imgUrl}
                     alt={`Default ${index}`}
+                    className="rounded-circle border border-light shadow-sm mx-2"
                     style={{
-                      width: "60px",
-                      height: "60px",
+                      width: "75px",
+                      height: "75px",
                       objectFit: "cover",
                       cursor: "pointer",
+                      transition: "all 0.2s ease-in-out",
                       border:
                         newProfilePicture === imgUrl
-                          ? "3px solid #007bff"
-                          : "1px solid #ccc",
-                      borderRadius: "50%",
-                      marginRight: "10px",
-                      marginBottom: "10px",
+                          ? "4px solid #007bff"
+                          : "2px solid #ddd",
+                      boxShadow: "0px 6px 10px rgba(0, 0, 0, 0.15)",
                     }}
+                    onMouseOver={(e) =>
+                      (e.target.style.transform = "scale(1.15)")
+                    }
+                    onMouseOut={(e) => (e.target.style.transform = "scale(1)")}
                     onClick={() => setNewProfilePicture(imgUrl)}
                   />
                 ))}
@@ -1220,8 +1533,17 @@ function EditProfileButton({
             </Form.Group>
           </Form>
         </Modal.Body>
-        <Modal.Footer>
-          <Button variant="success" onClick={handleSave}>
+        <Modal.Footer className="bg-transparent border-0">
+          <Button
+            variant="success"
+            onClick={handleSave}
+            className="px-4 py-2 fw-bold rounded-pill shadow-sm"
+            style={{
+              backgroundColor: "#c7c7c7",
+              borderColor: "#c7c7c7",
+              color: "#fff",
+            }}
+          >
             Save Changes
           </Button>
         </Modal.Footer>
