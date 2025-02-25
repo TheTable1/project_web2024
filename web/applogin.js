@@ -9,7 +9,7 @@ const firebaseConfig = {
   storageBucket: "web2567teungteung.firebasestorage.app",
   messagingSenderId: "472898800755",
   appId: "1:472898800755:web:b861572160a6ca34a4ae06",
-  measurementId: "G-LVKQEQ5Z67"
+  measurementId: "G-LVKQEQ5Z67",
 };
 
 // Initialize Firebase (compat version)
@@ -280,24 +280,36 @@ class App extends React.Component {
     const { user, subjects, showSubjects, showClassroom, selectedSubject } =
       this.state;
     return (
-      <Container className="mt-4 p-4 rounded-3 shadow-lg" style={{ background: "#e0e0e0", minHeight: "100vh" }}>
+      <Container
+        className="mt-4 p-4 rounded-3 shadow-lg"
+        style={{ background: "#e0e0e0", minHeight: "100vh" }}
+      >
         <Card className="shadow-sm">
           <Card.Body>
             <LoginBox user={this.state.user} app={this} />
             {user && (
-              <div >
-                <Button variant="success" className="mt-2" onClick={this.toggleSubjects}><i className="bi bi-pencil-square me-2">
-                </i> Subject
+              <div>
+                <Button
+                  variant="success"
+                  className="mt-2"
+                  onClick={this.toggleSubjects}
+                >
+                  <i className="bi bi-pencil-square me-2"></i> Subject
                 </Button>
-                <Button variant="success" className="mt-2 ms-3" onClick={this.toggleClassroom}><i className="bi bi-pencil-square me-2">
-                </i> Classroom
+                <Button
+                  variant="success"
+                  className="mt-2 ms-3"
+                  onClick={this.toggleClassroom}
+                >
+                  <i className="bi bi-pencil-square me-2"></i> Classroom
                 </Button>
               </div>
             )}
             {user && showSubjects && (
               <div className="mt-4">
-
-                <h3 className="mb-3" style={{ color: "black" }}>Manage Subjects</h3>
+                <h3 className="mb-3" style={{ color: "black" }}>
+                  Manage Subjects
+                </h3>
 
                 {/* ฟอร์มสำหรับเพิ่มวิชาใหม่ */}
                 <Row className="mb-3">
@@ -512,10 +524,10 @@ function SubjectDetail({ subject, onBack, userId }) {
     variant="secondary"
     size="sm"
     className="rounded-3 fw-bold"
-    onClick={() => openQA("CP001002")}  // ใส่ subjectId ที่ต้องการ
+    onClick={() => openQA("CP001002")} // ใส่ subjectId ที่ต้องการ
   >
     ถาม-ตอบ
-  </Button>
+  </Button>;
 
   const fetchStudentStatus = async (studentId) => {
     try {
@@ -582,7 +594,9 @@ function SubjectDetail({ subject, onBack, userId }) {
       );
 
       // Filter out undefined entries (in case of errors)
-      const validStudents = studentsList.filter((student) => student !== undefined);
+      const validStudents = studentsList.filter(
+        (student) => student !== undefined
+      );
 
       console.log("Fetched students:", validStudents);
 
@@ -591,7 +605,7 @@ function SubjectDetail({ subject, onBack, userId }) {
       setShowCheckinList(false);
       setShowStudentsList(true);
       setShowScoresList(false);
-      setSelectedCheckin(null)
+      setSelectedCheckin(null);
     } catch (error) {
       console.error("Error fetching students:", error);
     }
@@ -682,44 +696,44 @@ function SubjectDetail({ subject, onBack, userId }) {
         .doc(subject.id)
         .collection("checkin")
         .doc(checkinId);
-  
+
       // Step 2: Fetch the checkin document
       const checkinDoc = await checkinDocRef.get();
-  
+
       // Step 3: Check if the document exists
       if (!checkinDoc.exists) {
         console.log("Check-in document does not exist.");
         return;
       }
-  
+
       // Step 4: Store the check-in document data in the state
       const checkinData = { id: checkinDoc.id, ...checkinDoc.data() };
-  
+
       // Step 5: Access the students subcollection for the current checkin
       const studentsRef = checkinDocRef.collection("students");
       const studentsSnapshot = await studentsRef.get();
-  
+
       console.log("Fetched check-in data:", studentsSnapshot);
-  
+
       // Step 6: Check if the students subcollection contains any documents
       if (!studentsSnapshot.empty) {
         const studentsData = await Promise.all(
           studentsSnapshot.docs.map(async (doc) => {
             const studentData = doc.data();
             console.log("Fetched student data:", studentData);
-  
+
             const uid = doc.id; // The document ID is the UID
             console.log("Student UID (Document ID):", uid);
-  
+
             // Step 7: Fetch the user data from the 'users' collection using the uid
             const userDocRef = db.collection("users").doc(uid);
             const userDoc = await userDocRef.get();
-  
+
             if (userDoc.exists) {
               return {
                 id: doc.id,
                 stdid: userDoc.data().stid, // Assuming 'stid' is in the 'users' collection
-                name: userDoc.data().name,  // Assuming 'name' is in the 'users' collection
+                name: userDoc.data().name, // Assuming 'name' is in the 'users' collection
                 remark: studentData.remark,
                 date: studentData.date,
               };
@@ -729,10 +743,12 @@ function SubjectDetail({ subject, onBack, userId }) {
             }
           })
         );
-  
+
         // Filter out any null values in case user data was not found
-        const validStudentsData = studentsData.filter(student => student !== null);
-  
+        const validStudentsData = studentsData.filter(
+          (student) => student !== null
+        );
+
         // Step 8: Update the state with both check-in data and students data
         setSelectedCheckin({ ...checkinData, students: validStudentsData });
       } else {
@@ -757,7 +773,9 @@ function SubjectDetail({ subject, onBack, userId }) {
       await checkinDocRef.update({ status: newStatus });
 
       // Update local state after changing status in Firestore
-      setSelectedCheckin((prev) => (prev ? { ...prev, status: newStatus } : prev));
+      setSelectedCheckin((prev) =>
+        prev ? { ...prev, status: newStatus } : prev
+      );
 
       console.log(`Check-in status updated to ${newStatus}`);
     } catch (error) {
@@ -779,8 +797,8 @@ function SubjectDetail({ subject, onBack, userId }) {
         console.log("No check-in found");
         setCheckinList([]); // Ensure setCheckinList is used (typo fix)
         setShowCheckinList(true);
-      setShowStudentsList(false);
-      setShowScoresList(false);
+        setShowStudentsList(false);
+        setShowScoresList(false);
         return;
       }
 
@@ -841,7 +859,11 @@ function SubjectDetail({ subject, onBack, userId }) {
             <strong>Room:</strong> {subject.room || "-"}
           </Card.Text>
           <div className="mb-2">
-            <Button variant="success" onClick={fetchCheckinList} className="me-2">
+            <Button
+              variant="success"
+              onClick={fetchCheckinList}
+              className="me-2"
+            >
               บันทึกการเช็คชื่อ
             </Button>
             <Button
@@ -851,11 +873,8 @@ function SubjectDetail({ subject, onBack, userId }) {
             >
               แสดง QRCode วิชา
             </Button>
-            <Button variant="secondary" onClick={openQAModal} className="me-2">
+            <Button variant="secondary" onClick={openQA} className="me-2">
               ถาม-ตอบ
-            </Button>
-            <Button variant="info" onClick={openQuestionList} className="me-2">
-              ดูคำถาม
             </Button>
           </div>
           <div className="mb-2">
@@ -870,19 +889,21 @@ function SubjectDetail({ subject, onBack, userId }) {
                 <Form.Control
                   type="text"
                   value={studentCode}
-                  onChange={(e) => setStudentCode(e.target.value)} 
+                  onChange={(e) => setStudentCode(e.target.value)}
                   placeholder="Enter Student code"
                   className="mb-2"
                 />
               </Col>
               <Col>
-              <Button variant="dark" onClick={handleAddStudent} className="me-2">
-              Join Classroom
-            </Button>
+                <Button
+                  variant="dark"
+                  onClick={handleAddStudent}
+                  className="me-2"
+                >
+                  Join Classroom
+                </Button>
               </Col>
-              
             </Row>
-            
           </div>
         </Card.Body>
       </Card>
@@ -954,7 +975,7 @@ function SubjectDetail({ subject, onBack, userId }) {
 
                               // Update the student's status to 1 (Accepted)
                               await studentDocRef.update({
-                                status: 1 // Change the status to 1 (Accepted)
+                                status: 1, // Change the status to 1 (Accepted)
                               });
 
                               console.log("Student accepted:", student.id);
@@ -985,7 +1006,10 @@ function SubjectDetail({ subject, onBack, userId }) {
                                 prevStudents.filter((s) => s.id !== student.id)
                               );
 
-                              console.log("Student rejected and removed:", student.id);
+                              console.log(
+                                "Student rejected and removed:",
+                                student.id
+                              );
                             } catch (error) {
                               console.error("Error rejecting student:", error);
                             }
@@ -1015,7 +1039,10 @@ function SubjectDetail({ subject, onBack, userId }) {
                               prevStudents.filter((s) => s.id !== student.id)
                             );
 
-                            console.log("Student rejected and removed:", student.id);
+                            console.log(
+                              "Student rejected and removed:",
+                              student.id
+                            );
                           } catch (error) {
                             console.error("Error rejecting student:", error);
                           }
@@ -1027,7 +1054,6 @@ function SubjectDetail({ subject, onBack, userId }) {
                   </td>
                 </tr>
               ))}
-
             </tbody>
           </Table>
         </div>
@@ -1069,22 +1095,27 @@ function SubjectDetail({ subject, onBack, userId }) {
                 <tr key={checkin.id}>
                   <td>{index + 1}</td>
                   <td>{checkin.code}</td>
-                  <td>{checkin.date?.seconds
-                    ? new Date(checkin.date.seconds * 1000).toLocaleString("th-TH", {
-                      day: "2-digit",
-                      month: "2-digit",
-                      year: "numeric",
-                      hour: "2-digit",
-                      minute: "2-digit",
-                      hour12: false, // Ensure 24-hour format
-                    })
-                    : "N/A"}</td>
+                  <td>
+                    {checkin.date?.seconds
+                      ? new Date(checkin.date.seconds * 1000).toLocaleString(
+                          "th-TH",
+                          {
+                            day: "2-digit",
+                            month: "2-digit",
+                            year: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                            hour12: false, // Ensure 24-hour format
+                          }
+                        )
+                      : "N/A"}
+                  </td>
                   <td>
                     {checkin.status === 0
                       ? "ยังไม่เริ่ม"
                       : checkin.status === 1
-                        ? "กำลังเช็คชื่อ"
-                        : "เสร็จแล้ว"}
+                      ? "กำลังเช็คชื่อ"
+                      : "เสร็จแล้ว"}
                   </td>
                   <td>
                     <Button
@@ -1094,50 +1125,69 @@ function SubjectDetail({ subject, onBack, userId }) {
                     >
                       View
                     </Button>
-
                   </td>
                 </tr>
               ))}
             </tbody>
           </Table>
         </div>
-      )
-      }
+      )}
 
       {selectedCheckin && (
         <div className="mt-4 p-3 border rounded">
           <h5>รายละเอียดเช็คชื่อ</h5>
-          <p><strong>รหัส:</strong> {selectedCheckin.code}</p>
+          <p>
+            <strong>รหัส:</strong> {selectedCheckin.code}
+          </p>
           <p>
             <strong>เวลาเช็คชื่อ:</strong>{" "}
             {selectedCheckin.date?.seconds
-              ? new Date(selectedCheckin.date.seconds * 1000).toLocaleString("th-TH", {
-                day: "2-digit",
-                month: "2-digit",
-                year: "numeric",
-                hour: "2-digit",
-                minute: "2-digit",
-                hour12: false,
-              })
+              ? new Date(selectedCheckin.date.seconds * 1000).toLocaleString(
+                  "th-TH",
+                  {
+                    day: "2-digit",
+                    month: "2-digit",
+                    year: "numeric",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    hour12: false,
+                  }
+                )
               : "N/A"}
           </p>
-          <p><strong>สถานะ:</strong>
+          <p>
+            <strong>สถานะ:</strong>
             {selectedCheckin.status === 0
               ? "ยังไม่เริ่ม"
               : selectedCheckin.status === 1
-                ? "กำลังเช็คชื่อ"
-                : "เสร็จแล้ว"}
+              ? "กำลังเช็คชื่อ"
+              : "เสร็จแล้ว"}
           </p>
           <div>
-            <Button variant="secondary" onClick={() => setSelectedCheckin(null)}>Close</Button>
-            <Button variant="success" onClick={() => {
-              handleupdateCheckinStatus(selectedCheckin.id, 1);
-              fetchCheckinList();
-            }}>เปิด</Button>
-            <Button variant="danger" onClick={() => {
-              handleupdateCheckinStatus(selectedCheckin.id, 2);
-              fetchCheckinList();
-            }}>ปิด</Button>
+            <Button
+              variant="secondary"
+              onClick={() => setSelectedCheckin(null)}
+            >
+              Close
+            </Button>
+            <Button
+              variant="success"
+              onClick={() => {
+                handleupdateCheckinStatus(selectedCheckin.id, 1);
+                fetchCheckinList();
+              }}
+            >
+              เปิด
+            </Button>
+            <Button
+              variant="danger"
+              onClick={() => {
+                handleupdateCheckinStatus(selectedCheckin.id, 2);
+                fetchCheckinList();
+              }}
+            >
+              ปิด
+            </Button>
           </div>
           <Table striped bordered hover responsive>
             <thead className="table-dark">
@@ -1160,7 +1210,6 @@ function SubjectDetail({ subject, onBack, userId }) {
                 </tr>
               ))}
             </tbody>
-
           </Table>
         </div>
       )}
@@ -1187,7 +1236,6 @@ function SubjectDetail({ subject, onBack, userId }) {
                   <td>{index + 1}</td>
                   <td>{score.code || "-"}</td>
                   <td>{score.name || "-"}</td>
-              
                 </tr>
               ))}
             </tbody>
@@ -1392,7 +1440,8 @@ function LoginBox({ user, app }) {
             createdAt: firebase.firestore.FieldValue.serverTimestamp(),
           };
 
-          userRef.set(newUser)
+          userRef
+            .set(newUser)
             .then(() => {
               console.log("New user added to Firestore");
               setUserData(newUser);
@@ -1528,11 +1577,14 @@ function EditProfileButton({
         <Modal.Header closeButton className="bg-transparent border-0">
           <Modal.Title className="fw-bold text-dark">Edit Profile</Modal.Title>
         </Modal.Header>
-        <Modal.Body className="p-4 rounded border-0" style={{
-          background: "#f8f9fa",
-          color: "#333",
-          boxShadow: "none"
-        }}>
+        <Modal.Body
+          className="p-4 rounded border-0"
+          style={{
+            background: "#f8f9fa",
+            color: "#333",
+            boxShadow: "none",
+          }}
+        >
           <Form>
             <Form.Group className="mb-3">
               <Form.Label className="fw-semibold">Name:</Form.Label>
@@ -1565,7 +1617,9 @@ function EditProfileButton({
               />
             </Form.Group>
             <Form.Group className="mb-3">
-              <Form.Label className="fw-semibold">Select Default Profile Picture:</Form.Label>
+              <Form.Label className="fw-semibold">
+                Select Default Profile Picture:
+              </Form.Label>
               <div className="d-flex flex-wrap justify-content-center">
                 {defaultImages.map((imgUrl, index) => (
                   <img
@@ -1579,10 +1633,15 @@ function EditProfileButton({
                       objectFit: "cover",
                       cursor: "pointer",
                       transition: "all 0.2s ease-in-out",
-                      border: newProfilePicture === imgUrl ? "4px solid #007bff" : "2px solid #ddd",
+                      border:
+                        newProfilePicture === imgUrl
+                          ? "4px solid #007bff"
+                          : "2px solid #ddd",
                       boxShadow: "0px 6px 10px rgba(0, 0, 0, 0.15)",
                     }}
-                    onMouseOver={(e) => (e.target.style.transform = "scale(1.15)")}
+                    onMouseOver={(e) =>
+                      (e.target.style.transform = "scale(1.15)")
+                    }
                     onMouseOut={(e) => (e.target.style.transform = "scale(1)")}
                     onClick={() => setNewProfilePicture(imgUrl)}
                   />
@@ -1592,12 +1651,20 @@ function EditProfileButton({
           </Form>
         </Modal.Body>
         <Modal.Footer className="bg-transparent border-0">
-          <Button variant="success" onClick={handleSave} className="px-4 py-2 fw-bold rounded-pill shadow-sm" style={{ backgroundColor: "#c7c7c7", borderColor: "#c7c7c7", color: "#fff" }}>
+          <Button
+            variant="success"
+            onClick={handleSave}
+            className="px-4 py-2 fw-bold rounded-pill shadow-sm"
+            style={{
+              backgroundColor: "#c7c7c7",
+              borderColor: "#c7c7c7",
+              color: "#fff",
+            }}
+          >
             Save Changes
           </Button>
         </Modal.Footer>
       </Modal>
-
     </>
   );
 }
@@ -1611,7 +1678,6 @@ root.render(
   </React.StrictMode>
 );
 
-
 //---//
 const express = require("express");
 const admin = require("firebase-admin");
@@ -1620,11 +1686,13 @@ const cors = require("cors");
 
 // 🔥 กำหนด CORS ให้ทุกโดเมนเข้าถึง API ได้
 const app = express();
-app.use(cors({
-  origin: "*",
-  methods: ["GET", "POST", "DELETE"],
-  allowedHeaders: ["Content-Type"]
-}));
+app.use(
+  cors({
+    origin: "*",
+    methods: ["GET", "POST", "DELETE"],
+    allowedHeaders: ["Content-Type"],
+  })
+);
 app.use(bodyParser.json());
 
 // 🔥 Initialize Firebase Admin
@@ -1646,15 +1714,14 @@ app.post("/users/:uid/classroom/:cid/question", async (req, res) => {
   const { question_no, question_text, question_show } = req.body;
 
   try {
-    await dbb.collection("users")
-      .doc(uid)
-      .collection("classroom")
-      .doc(cid)
-      .set({
+    await dbb.collection("users").doc(uid).collection("classroom").doc(cid).set(
+      {
         question_no,
         question_text,
-        question_show
-      }, { merge: true });
+        question_show,
+      },
+      { merge: true }
+    );
 
     res.status(200).json({ message: "✅ Question set successfully" });
   } catch (error) {
@@ -1669,7 +1736,8 @@ app.post("/users/:uid/classroom/:cid/question", async (req, res) => {
 app.get("/users/:uid/classroom/:cid/question", async (req, res) => {
   const { uid, cid } = req.params;
   try {
-    const doc = await dbb.collection("users")
+    const doc = await dbb
+      .collection("users")
       .doc(uid)
       .collection("classroom")
       .doc(cid)
@@ -1692,14 +1760,15 @@ app.get("/users/:uid/classroom/:cid/question", async (req, res) => {
 app.delete("/users/:uid/classroom/:cid/question", async (req, res) => {
   const { uid, cid } = req.params;
   try {
-    await dbb.collection("users")
+    await dbb
+      .collection("users")
       .doc(uid)
       .collection("classroom")
       .doc(cid)
       .update({
         question_no: admin.firestore.FieldValue.delete(),
         question_text: admin.firestore.FieldValue.delete(),
-        question_show: admin.firestore.FieldValue.delete()
+        question_show: admin.firestore.FieldValue.delete(),
       });
 
     res.status(200).json({ message: "✅ Question deleted successfully" });
