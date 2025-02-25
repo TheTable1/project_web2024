@@ -3,13 +3,13 @@ const { Alert, Card, Button, Table, Form, Modal, Container, Row, Col } =
 
 // Firebase Configuration
 const firebaseConfig = {
-  apiKey: "AIzaSyDpyi2trOVCMFZfTRTClLUSv9urSqFpmLA",
-  authDomain: "projectweb-150fc.firebaseapp.com",
-  projectId: "projectweb-150fc",
-  storageBucket: "projectweb-150fc.firebasestorage.app",
-  messagingSenderId: "148917915697",
-  appId: "1:148917915697:web:93234e5ae2e53293320510",
-  measurementId: "G-NXDX5YSHDE",
+  apiKey: "AIzaSyDrjydWmT19vEJu6zvsJCZk-iLg5P9G_9c",
+  authDomain: "web2567teungteung.firebaseapp.com",
+  projectId: "web2567teungteung",
+  storageBucket: "web2567teungteung.firebasestorage.app",
+  messagingSenderId: "472898800755",
+  appId: "1:472898800755:web:b861572160a6ca34a4ae06",
+  measurementId: "G-LVKQEQ5Z67"
 };
 
 // Initialize Firebase (compat version)
@@ -18,7 +18,22 @@ if (!firebase.apps.length) {
 }
 const db = firebase.firestore();
 const auth = firebase.auth();
-const storage = firebase.storage();
+
+// Component สำหรับสร้าง QR Code ด้วย QRCode.js
+function QRCodeComponent({ value, size }) {
+  const qrRef = React.useRef(null);
+  React.useEffect(() => {
+    if (qrRef.current) {
+      qrRef.current.innerHTML = "";
+      new QRCode(qrRef.current, {
+        text: value,
+        width: size,
+        height: size,
+      });
+    }
+  }, [value, size]);
+  return <div ref={qrRef}></div>;
+}
 
 // Main App Component
 class App extends React.Component {
@@ -31,6 +46,7 @@ class App extends React.Component {
       newSubject: "",
       newSubjectCode: "",
       newRoom: "",
+      newCheckincode: "",
       newPhoto: null, // URL ของอวตารที่เลือกสำหรับเพิ่มวิชา
       // สำหรับการแสดงวิชาใน Classroom/Subject Detail
       showSubjects: false,
@@ -259,24 +275,25 @@ class App extends React.Component {
       auth.signOut();
     }
   };
-//------1-----///
+
   render() {
     const { user, subjects, showSubjects, showClassroom, selectedSubject } =
       this.state;
     return (
       <Container className="mt-4 p-4 rounded-3 shadow-lg" style={{ background: "#e0e0e0", minHeight: "100vh" }}>
-
         <Card className="shadow-sm">
-          <Card.Body> 
+          <Card.Body>
             <LoginBox user={this.state.user} app={this} />
-            <div >
-            <Button variant="success" className="mt-2" onClick={this.toggleSubjects}><i className="bi bi-pencil-square me-2">
-        </i> Subject
-      </Button>
-      <Button variant="success" className="mt-2 ms-3" onClick={this.toggleClassroom}><i className="bi bi-pencil-square me-2">
-        </i> Classroom
-      </Button>
-            </div>
+            {user && (
+              <div >
+                <Button variant="success" className="mt-2" onClick={this.toggleSubjects}><i className="bi bi-pencil-square me-2">
+                </i> Subject
+                </Button>
+                <Button variant="success" className="mt-2 ms-3" onClick={this.toggleClassroom}><i className="bi bi-pencil-square me-2">
+                </i> Classroom
+                </Button>
+              </div>
+            )}
             {user && showSubjects && (
               <div className="mt-4">
 
@@ -396,7 +413,6 @@ class App extends React.Component {
   }
 }
 
-//-------2----------///
 // Component: SubjectTable
 function SubjectTable({ subjects, onDelete, onEdit }) {
   return (
@@ -430,7 +446,7 @@ function SubjectTable({ subjects, onDelete, onEdit }) {
                 onClick={() => onDelete(subject.id)}
               >
                 Delete
-              </Button><i class="fa fa-xing" aria-hidden="true"></i>
+              </Button>
             </td>
           </tr>
         ))}
@@ -470,133 +486,315 @@ function ClassroomList({ subjects, onSelect }) {
 // Component: SubjectDetail (หน้ารายละเอียดวิชาพร้อมฟังก์ชันเช็คชื่อ)
 function SubjectDetail({ subject, onBack, userId }) {
   const [showQRCodeModal, setShowQRCodeModal] = React.useState(false);
-  const [checkinStatus, setCheckinStatus] = React.useState(null); // "open" หรือ "closed"
-  const [currentCheckinNo, setCurrentCheckinNo] = React.useState("");
   const [students, setStudents] = React.useState([]);
   const [showStudentsList, setShowStudentsList] = React.useState(false);
   const [scores, setScores] = React.useState([]);
   const [showScoresList, setShowScoresList] = React.useState(false);
+  const [checkinList, setCheckinList] = React.useState([]);
+  const [showCheckinList, setShowCheckinList] = React.useState(false);
+  const [newCheckinCode, setNewCheckinCode] = React.useState("");
+  const [selectedCheckin, setSelectedCheckin] = React.useState(null);
+  const [studentCode, setStudentCode] = React.useState("");
 
   // สร้าง URL สำหรับรายละเอียดวิชา (ปรับเปลี่ยนได้ตามโปรเจค)
-  const detailURL = `https://yourwebsite.com/subject-details/${subject.id}`;
+  const detailURL = `${subject.id}`;
 
-  // เปิดเช็คชื่อ: สร้างเอกสาร checkin ใหม่ใน path /classroom/{cid}/checkin/{cno}
-  const openCheckin = async () => {
-    const cno = "checkin_" + Date.now();
-    setCurrentCheckinNo(cno);
-    await db
-      .collection("users")
-      .doc(userId)
-      .collection("classroom")
-      .doc(subject.id)
-      .collection("checkin")
-      .doc(cno)
-      .set({
-        status: "open",
-        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-      });
-    setCheckinStatus("open");
-    alert("เช็คชื่อเปิดแล้ว รหัส: " + cno);
-  };
-
-  // ปิดเช็คชื่อ: อัปเดตสถานะเป็น closed
-  const closeCheckin = async () => {
-    if (!currentCheckinNo) {
-      alert("ไม่มีการเช็คชื่อที่เปิดอยู่");
-      return;
-    }
-    await db
-      .collection("users")
-      .doc(userId)
-      .collection("classroom")
-      .doc(subject.id)
-      .collection("checkin")
-      .doc(currentCheckinNo)
-      .update({ status: "closed" });
-    setCheckinStatus("closed");
-    alert("เช็คชื่อปิดแล้ว");
-  };
-
-  // บันทึกการเช็คชื่อ: คัดลอกข้อมูลจาก students ไป scores โดยเพิ่ม status = 1
-  const saveCheckin = async () => {
-    if (!currentCheckinNo) {
-      alert("ไม่มีการเช็คชื่อที่เปิดอยู่");
-      return;
-    }
-    const studentsSnap = await db
-      .collection("users")
-      .doc(userId)
-      .collection("classroom")
-      .doc(subject.id)
-      .collection("checkin")
-      .doc(currentCheckinNo)
-      .collection("students")
-      .get();
-    const batch = db.batch();
-    studentsSnap.forEach((doc) => {
-      const scoreRef = db
-        .collection("users")
-        .doc(userId)
-        .collection("classroom")
-        .doc(subject.id)
-        .collection("checkin")
-        .doc(currentCheckinNo)
-        .collection("scores")
-        .doc(doc.id);
-      batch.set(scoreRef, { ...doc.data(), status: 1 });
-    });
-    await batch.commit();
-    alert("บันทึกการเช็คชื่อเรียบร้อย");
-  };
-
-  // แสดงรหัสเช็คชื่อ
-  const showCheckinCode = () => {
-    if (!currentCheckinNo) {
-      alert("ไม่มีการเช็คชื่อที่เปิดอยู่");
-    } else {
-      alert("รหัสเช็คชื่อ: " + currentCheckinNo);
-    }
-  };
-  
-///----------////////////
   const openQA = (subjectId) => {
     if (!subjectId) {
-        alert("❌ กรุณาเลือกวิชาก่อนเข้าไปยังหน้าคำถาม!");
-        return;
+      alert("❌ กรุณาเลือกวิชาก่อนเข้าไปยังหน้าคำถาม!");
+      return;
     }
     window.location.href = `manage_questions.html?subjectId=${subjectId}`;
-};
+  };
 
-// ตัวอย่างการเรียกใช้ (จากปุ่ม)
-<Button 
-  variant="secondary" 
-  size="sm" 
-  className="rounded-3 fw-bold"
-  onClick={() => openQA("CP001002")}  // ใส่ subjectId ที่ต้องการ
->
-  ถาม-ตอบ
-</Button>
-//----เชื่อมไปหน้าคำถาม---//
+  // ตัวอย่างการเรียกใช้ (จากปุ่ม)
+  <Button
+    variant="secondary"
+    size="sm"
+    className="rounded-3 fw-bold"
+    onClick={() => openQA("CP001002")}  // ใส่ subjectId ที่ต้องการ
+  >
+    ถาม-ตอบ
+  </Button>
 
-  // Toggle แสดงรายชื่อผู้เช็คชื่อแบบ Realtime
-  const toggleStudentsList = () => {
-    if (!showStudentsList) {
-      const unsubscribe = db
+  const fetchStudentStatus = async (studentId) => {
+    try {
+      // Fetch the student's document from the students sub-collection
+      const studentDocRef = db
+        .collection("users")
+        .doc(userId) // Ensure userId is correctly set
+        .collection("classroom")
+        .doc(subject.id) // Ensure subject.id is set properly
+        .collection("students")
+        .doc(studentId);
+
+      const studentDoc = await studentDocRef.get();
+
+      if (studentDoc.exists) {
+        // Return the status field from the student's document
+        return studentDoc.data().status;
+      } else {
+        console.log("Student document does not exist.");
+        return null;
+      }
+    } catch (error) {
+      console.error("Error fetching student status:", error);
+      return null;
+    }
+  };
+
+  const fetchStudents = async () => {
+    try {
+      // Reference to the "students" collection in the classroom
+      const classroomRef = db
+        .collection("users")
+        .doc(userId)
+        .collection("classroom")
+        .doc(subject.id)
+        .collection("students");
+
+      const snapshot = await classroomRef.get(); // Get all students from the collection
+
+      if (snapshot.empty) {
+        console.log("No students found.");
+        setStudents([]); // Clear the student list
+
+        return;
+      }
+
+      // Extract student IDs from the snapshot
+      const studentIds = snapshot.docs.map((doc) => doc.id);
+
+      // Fetch student data from the "users" collection based on the IDs
+      const userDocs = await Promise.all(
+        studentIds.map((id) => db.collection("users").doc(id).get())
+      );
+
+      // Fetch the status for each student and construct the students list
+      const studentsList = await Promise.all(
+        userDocs.map(async (doc) => {
+          if (doc.exists) {
+            // Fetch status for the student using their ID
+            const status = await fetchStudentStatus(doc.id); // Pass the student ID here
+            return { id: doc.id, ...doc.data(), status };
+          }
+        })
+      );
+
+      // Filter out undefined entries (in case of errors)
+      const validStudents = studentsList.filter((student) => student !== undefined);
+
+      console.log("Fetched students:", validStudents);
+
+      // Update state with the fetched student data
+      setStudents(validStudents);
+      setShowCheckinList(false);
+      setShowStudentsList(true);
+      setShowScoresList(false);
+      setSelectedCheckin(null)
+    } catch (error) {
+      console.error("Error fetching students:", error);
+    }
+  };
+
+  const handleAddCheckin = async () => {
+    if (!newCheckinCode.trim()) {
+      alert("กรุณากรอกรหัสเช็คชื่อ");
+      return;
+    }
+
+    try {
+      // Get the latest check-in document to determine the next `cno`
+      const checkinCollectionRef = db
+        .collection("users")
+        .doc(userId)
+        .collection("classroom")
+        .doc(subject.id)
+        .collection("checkin");
+
+      const latestCheckinSnapshot = await checkinCollectionRef
+        .orderBy("cno", "desc")
+        .limit(1)
+        .get();
+
+      let newCno = 1; // Default to 1 if no check-ins exist
+
+      if (!latestCheckinSnapshot.empty) {
+        const latestCheckin = latestCheckinSnapshot.docs[0].data();
+        newCno = latestCheckin.cno + 1; // Increment `cno`
+      }
+
+      // Add new check-in document
+      const newCheckinRef = checkinCollectionRef.doc(newCno.toString());
+      await newCheckinRef.set({
+        cno: newCno,
+        code: newCheckinCode.trim(),
+        date: firebase.firestore.FieldValue.serverTimestamp(),
+        status: 0, // Default to "Not started"
+      });
+
+      setNewCheckinCode(""); // Clear input
+      alert("เพิ่มเช็คชื่อสำเร็จ!");
+      fetchCheckinList(); // Refresh check-in list
+    } catch (error) {
+      console.error("Error adding check-in:", error);
+    }
+  };
+
+  const handleAddStudent = async () => {
+    if (!studentCode) {
+      alert("กรุณากรอกรหัสนักศึกษา");
+      return;
+    }
+
+    try {
+      const subStudentCollectionRef = firebase
+        .firestore()
+        .collection("users")
+        .doc(userId) // Assuming userId is available in the component
+        .collection("classroom")
+        .doc(subject.id) // Assuming subject.id is available in the component
+        .collection("students");
+
+      const newStudentRef = subStudentCollectionRef.doc(studentCode); // Use the studentCode as the document ID
+
+      // Set the student document with a default status
+      await newStudentRef.set({
+        status: 0, // Default status "Pending"
+      });
+
+      alert("เพิ่มนักศึกษาสำเร็จ!");
+
+      // Clear the input after adding the student
+      setStudentCode("");
+    } catch (error) {
+      console.error("Error adding student:", error);
+    }
+  };
+
+  const handleViewCheckin = async (checkinId) => {
+    try {
+      // Step 1: Get the reference to the checkin document
+      const checkinDocRef = db
         .collection("users")
         .doc(userId)
         .collection("classroom")
         .doc(subject.id)
         .collection("checkin")
-        .doc(currentCheckinNo)
-        .collection("students")
-        .onSnapshot((snapshot) => {
-          const list = [];
-          snapshot.forEach((doc) => list.push({ id: doc.id, ...doc.data() }));
-          setStudents(list);
-        });
-      setShowStudentsList(true);
-    } else {
+        .doc(checkinId);
+  
+      // Step 2: Fetch the checkin document
+      const checkinDoc = await checkinDocRef.get();
+  
+      // Step 3: Check if the document exists
+      if (!checkinDoc.exists) {
+        console.log("Check-in document does not exist.");
+        return;
+      }
+  
+      // Step 4: Store the check-in document data in the state
+      const checkinData = { id: checkinDoc.id, ...checkinDoc.data() };
+  
+      // Step 5: Access the students subcollection for the current checkin
+      const studentsRef = checkinDocRef.collection("students");
+      const studentsSnapshot = await studentsRef.get();
+  
+      console.log("Fetched check-in data:", studentsSnapshot);
+  
+      // Step 6: Check if the students subcollection contains any documents
+      if (!studentsSnapshot.empty) {
+        const studentsData = await Promise.all(
+          studentsSnapshot.docs.map(async (doc) => {
+            const studentData = doc.data();
+            console.log("Fetched student data:", studentData);
+  
+            const uid = doc.id; // The document ID is the UID
+            console.log("Student UID (Document ID):", uid);
+  
+            // Step 7: Fetch the user data from the 'users' collection using the uid
+            const userDocRef = db.collection("users").doc(uid);
+            const userDoc = await userDocRef.get();
+  
+            if (userDoc.exists) {
+              return {
+                id: doc.id,
+                stdid: userDoc.data().stid, // Assuming 'stid' is in the 'users' collection
+                name: userDoc.data().name,  // Assuming 'name' is in the 'users' collection
+                remark: studentData.remark,
+                date: studentData.date,
+              };
+            } else {
+              console.log("User document not found for student:", uid);
+              return null; // Skip this student if user data is not found
+            }
+          })
+        );
+  
+        // Filter out any null values in case user data was not found
+        const validStudentsData = studentsData.filter(student => student !== null);
+  
+        // Step 8: Update the state with both check-in data and students data
+        setSelectedCheckin({ ...checkinData, students: validStudentsData });
+      } else {
+        console.log("No students found in this check-in.");
+        setSelectedCheckin({ ...checkinData, students: [] });
+      }
+    } catch (error) {
+      console.error("Error fetching check-in document or students:", error);
+    }
+  };
+
+  const handleupdateCheckinStatus = async (checkinId, newStatus) => {
+    try {
+      const checkinDocRef = db
+        .collection("users")
+        .doc(userId)
+        .collection("classroom")
+        .doc(subject.id)
+        .collection("checkin")
+        .doc(checkinId);
+
+      await checkinDocRef.update({ status: newStatus });
+
+      // Update local state after changing status in Firestore
+      setSelectedCheckin((prev) => (prev ? { ...prev, status: newStatus } : prev));
+
+      console.log(`Check-in status updated to ${newStatus}`);
+    } catch (error) {
+      console.error("Error updating check-in status:", error);
+    }
+  };
+
+  const fetchCheckinList = async () => {
+    try {
+      const checkinSnap = await db
+        .collection("users")
+        .doc(userId)
+        .collection("classroom")
+        .doc(subject.id)
+        .collection("checkin")
+        .get(); // Moved `.get()` to the end
+
+      if (checkinSnap.empty) {
+        console.log("No check-in found");
+        setCheckinList([]); // Ensure setCheckinList is used (typo fix)
+        setShowCheckinList(true);
       setShowStudentsList(false);
+      setShowScoresList(false);
+        return;
+      }
+
+      const checkinData = checkinSnap.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+
+      setCheckinList(checkinData); // Update the state with fetched data
+      setShowCheckinList(true);
+      setShowStudentsList(false);
+      setShowScoresList(false);
+    } catch (error) {
+      console.error("Error fetching check-in:", error);
     }
   };
 
@@ -608,32 +806,21 @@ function SubjectDetail({ subject, onBack, userId }) {
         .doc(userId)
         .collection("classroom")
         .doc(subject.id)
-        .collection("checkin")
-        .doc(currentCheckinNo)
         .collection("scores")
         .onSnapshot((snapshot) => {
           const list = [];
-          snapshot.forEach((doc) => list.push({ id: doc.id, ...doc.data() }));
+          snapshot.forEach((doc) => {
+            list.push({ id: doc.id, ...doc.data() });
+          });
           setScores(list);
         });
+      setShowCheckinList(false);
+      setShowStudentsList(false);
       setShowScoresList(true);
     } else {
       setShowScoresList(false);
+      setScores([]);
     }
-  };
-
-  // ฟังก์ชันอัปเดตคะแนน (แก้ไข input inline)
-  const updateScoreEntry = async (entryId, updatedData) => {
-    await db
-      .collection("users")
-      .doc(userId)
-      .collection("classroom")
-      .doc(subject.id)
-      .collection("checkin")
-      .doc(currentCheckinNo)
-      .collection("scores")
-      .doc(entryId)
-      .update(updatedData);
   };
 
   return (
@@ -654,17 +841,8 @@ function SubjectDetail({ subject, onBack, userId }) {
             <strong>Room:</strong> {subject.room || "-"}
           </Card.Text>
           <div className="mb-2">
-            <Button variant="primary" onClick={openCheckin} className="me-2">
-              เปิดเช็คชื่อ
-            </Button>
-            <Button variant="warning" onClick={closeCheckin} className="me-2">
-              ปิดเช็คชื่อ
-            </Button>
-            <Button variant="success" onClick={saveCheckin} className="me-2">
+            <Button variant="success" onClick={fetchCheckinList} className="me-2">
               บันทึกการเช็คชื่อ
-            </Button>
-            <Button variant="info" onClick={showCheckinCode} className="me-2">
-              แสดงรหัสเช็คชื่อ
             </Button>
             <Button
               variant="primary"
@@ -681,16 +859,30 @@ function SubjectDetail({ subject, onBack, userId }) {
             </Button>
           </div>
           <div className="mb-2">
-            <Button
-              variant="dark"
-              onClick={toggleStudentsList}
-              className="me-2"
-            >
+            <Button variant="dark" onClick={fetchStudents} className="me-2">
               แสดงรายชื่อ
             </Button>
             <Button variant="dark" onClick={toggleScoresList} className="me-2">
               แสดงคะแนน
             </Button>
+            <Row>
+              <Col md={3}>
+                <Form.Control
+                  type="text"
+                  value={studentCode}
+                  onChange={(e) => setStudentCode(e.target.value)} 
+                  placeholder="Enter Student code"
+                  className="mb-2"
+                />
+              </Col>
+              <Col>
+              <Button variant="dark" onClick={handleAddStudent} className="me-2">
+              Join Classroom
+            </Button>
+              </Col>
+              
+            </Row>
+            
           </div>
         </Card.Body>
       </Card>
@@ -705,12 +897,9 @@ function SubjectDetail({ subject, onBack, userId }) {
           <Modal.Title>QR Code for {subject.name}</Modal.Title>
         </Modal.Header>
         <Modal.Body className="text-center">
-          <img
-            src={`https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(
-              detailURL
-            )}&size=200x200`}
-            alt="QR Code"
-          />
+          <div className="mx-auto" style={{ width: 200 }}>
+            <QRCodeComponent value={detailURL} size={200} />
+          </div>
           <p className="mt-2">Scan to view subject details</p>
         </Modal.Body>
         <Modal.Footer>
@@ -720,10 +909,236 @@ function SubjectDetail({ subject, onBack, userId }) {
         </Modal.Footer>
       </Modal>
 
-      {/* Students List Table */}
       {showStudentsList && (
         <div className="mt-4">
-          <h5>รายชื่อผู้ที่เช็คชื่อ</h5>
+          <h5>รายชื่อนักศึกษาในห้อง</h5>
+          <Table striped bordered hover responsive>
+            <thead className="table-dark">
+              <tr>
+                <th>ลำดับ</th>
+                <th>รหัส</th>
+                <th>ชื่อ</th>
+                <th>สถานะ</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {students.map((student, index) => (
+                <tr key={student.id}>
+                  <td>{index + 1}</td>
+                  <td>{student.stid || "-"}</td>
+                  <td>{student.name || "-"}</td>
+                  <td>{student.status}</td>
+                  <td>
+                    {student.status === 0 ? (
+                      <>
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          onClick={async () => {
+                            try {
+                              const studentDocRef = db
+                                .collection("users")
+                                .doc(userId) // Ensure userId is defined properly
+                                .collection("classroom")
+                                .doc(subject.id) // Ensure subject.id is correct
+                                .collection("students")
+                                .doc(student.id); // Ensure student.id is valid
+
+                              const studentDoc = await studentDocRef.get();
+
+                              if (!studentDoc.exists) {
+                                console.log("Student document does not exist.");
+                                return;
+                              }
+
+                              // Update the student's status to 1 (Accepted)
+                              await studentDocRef.update({
+                                status: 1 // Change the status to 1 (Accepted)
+                              });
+
+                              console.log("Student accepted:", student.id);
+                            } catch (error) {
+                              console.error("Error accepting student:", error);
+                            }
+                          }}
+                        >
+                          Accept
+                        </Button>
+                        <Button
+                          variant="danger"
+                          size="sm"
+                          onClick={async () => {
+                            try {
+                              // Remove the student from the sub-collection "students"
+                              await db
+                                .collection("users")
+                                .doc(userId)
+                                .collection("classroom")
+                                .doc(subject.id)
+                                .collection("students")
+                                .doc(student.id)
+                                .delete(); // Delete the student document from "students" collection
+
+                              // Now remove the student from the local state to re-render the table
+                              setStudents((prevStudents) =>
+                                prevStudents.filter((s) => s.id !== student.id)
+                              );
+
+                              console.log("Student rejected and removed:", student.id);
+                            } catch (error) {
+                              console.error("Error rejecting student:", error);
+                            }
+                          }}
+                        >
+                          Reject
+                        </Button>
+                      </>
+                    ) : (
+                      <Button
+                        variant="danger"
+                        size="sm"
+                        onClick={async () => {
+                          try {
+                            // Remove the student from the sub-collection "students"
+                            await db
+                              .collection("users")
+                              .doc(userId)
+                              .collection("classroom")
+                              .doc(subject.id)
+                              .collection("students")
+                              .doc(student.id)
+                              .delete(); // Delete the student document from "students" collection
+
+                            // Now remove the student from the local state to re-render the table
+                            setStudents((prevStudents) =>
+                              prevStudents.filter((s) => s.id !== student.id)
+                            );
+
+                            console.log("Student rejected and removed:", student.id);
+                          } catch (error) {
+                            console.error("Error rejecting student:", error);
+                          }
+                        }}
+                      >
+                        Delete
+                      </Button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+
+            </tbody>
+          </Table>
+        </div>
+      )}
+
+      {showCheckinList && (
+        <div className="mt-4">
+          <h5>รายการการเช็คชื่อในห้อง</h5>
+
+          <Row className="mb-3">
+            <Col md={3}>
+              <Form.Control
+                type="text"
+                value={newCheckinCode}
+                onChange={(e) => setNewCheckinCode(e.target.value)}
+                placeholder="Enter check-in code"
+                className="mb-2"
+              />
+            </Col>
+            <Col>
+              <Button variant="success" onClick={handleAddCheckin}>
+                Add Check-in
+              </Button>
+            </Col>
+          </Row>
+
+          <Table striped bordered hover responsive>
+            <thead className="table-dark">
+              <tr>
+                <th>ลำดับ</th>
+                <th>รหัส</th>
+                <th>เวลาเช็คชื่อ</th>
+                <th>สถานะ</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {checkinList.map((checkin, index) => (
+                <tr key={checkin.id}>
+                  <td>{index + 1}</td>
+                  <td>{checkin.code}</td>
+                  <td>{checkin.date?.seconds
+                    ? new Date(checkin.date.seconds * 1000).toLocaleString("th-TH", {
+                      day: "2-digit",
+                      month: "2-digit",
+                      year: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                      hour12: false, // Ensure 24-hour format
+                    })
+                    : "N/A"}</td>
+                  <td>
+                    {checkin.status === 0
+                      ? "ยังไม่เริ่ม"
+                      : checkin.status === 1
+                        ? "กำลังเช็คชื่อ"
+                        : "เสร็จแล้ว"}
+                  </td>
+                  <td>
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={() => handleViewCheckin(checkin.id)}
+                    >
+                      View
+                    </Button>
+
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </Table>
+        </div>
+      )
+      }
+
+      {selectedCheckin && (
+        <div className="mt-4 p-3 border rounded">
+          <h5>รายละเอียดเช็คชื่อ</h5>
+          <p><strong>รหัส:</strong> {selectedCheckin.code}</p>
+          <p>
+            <strong>เวลาเช็คชื่อ:</strong>{" "}
+            {selectedCheckin.date?.seconds
+              ? new Date(selectedCheckin.date.seconds * 1000).toLocaleString("th-TH", {
+                day: "2-digit",
+                month: "2-digit",
+                year: "numeric",
+                hour: "2-digit",
+                minute: "2-digit",
+                hour12: false,
+              })
+              : "N/A"}
+          </p>
+          <p><strong>สถานะ:</strong>
+            {selectedCheckin.status === 0
+              ? "ยังไม่เริ่ม"
+              : selectedCheckin.status === 1
+                ? "กำลังเช็คชื่อ"
+                : "เสร็จแล้ว"}
+          </p>
+          <div>
+            <Button variant="secondary" onClick={() => setSelectedCheckin(null)}>Close</Button>
+            <Button variant="success" onClick={() => {
+              handleupdateCheckinStatus(selectedCheckin.id, 1);
+              fetchCheckinList();
+            }}>เปิด</Button>
+            <Button variant="danger" onClick={() => {
+              handleupdateCheckinStatus(selectedCheckin.id, 2);
+              fetchCheckinList();
+            }}>ปิด</Button>
+          </div>
           <Table striped bordered hover responsive>
             <thead className="table-dark">
               <tr>
@@ -732,49 +1147,24 @@ function SubjectDetail({ subject, onBack, userId }) {
                 <th>ชื่อ</th>
                 <th>หมายเหตุ</th>
                 <th>วันเวลา</th>
-                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
-              {students.map((student, index) => (
+              {selectedCheckin.students.map((student, index) => (
                 <tr key={student.id}>
                   <td>{index + 1}</td>
-                  <td>{student.code || "-"}</td>
+                  <td>{student.stdid || "-"}</td>
                   <td>{student.name || "-"}</td>
-                  <td>{student.note || "-"}</td>
-                  <td>
-                    {student.timestamp
-                      ? student.timestamp.toDate().toLocaleString()
-                      : "-"}
-                  </td>
-                  <td>
-                    <Button
-                      variant="danger"
-                      size="sm"
-                      onClick={async () => {
-                        await db
-                          .collection("users")
-                          .doc(userId)
-                          .collection("classroom")
-                          .doc(subject.id)
-                          .collection("checkin")
-                          .doc(currentCheckinNo)
-                          .collection("students")
-                          .doc(student.id)
-                          .delete();
-                      }}
-                    >
-                      Delete
-                    </Button>
-                  </td>
+                  <td>{student.remark || "-"}</td>
+                  <td>{student.date?.toDate().toLocaleString() || "-"}</td>
                 </tr>
               ))}
             </tbody>
+
           </Table>
         </div>
       )}
 
-      {/* Scores List Table */}
       {showScoresList && (
         <div className="mt-4">
           <h5>คะแนนผู้เช็คชื่อ</h5>
@@ -797,49 +1187,7 @@ function SubjectDetail({ subject, onBack, userId }) {
                   <td>{index + 1}</td>
                   <td>{score.code || "-"}</td>
                   <td>{score.name || "-"}</td>
-                  <td>
-                    <Form.Control
-                      type="text"
-                      defaultValue={score.note || ""}
-                      onBlur={(e) =>
-                        updateScoreEntry(score.id, { note: e.target.value })
-                      }
-                    />
-                  </td>
-                  <td>
-                    {score.timestamp
-                      ? score.timestamp.toDate().toLocaleString()
-                      : "-"}
-                  </td>
-                  <td>
-                    <Form.Control
-                      type="number"
-                      defaultValue={score.score || 0}
-                      onBlur={(e) =>
-                        updateScoreEntry(score.id, {
-                          score: Number(e.target.value),
-                        })
-                      }
-                    />
-                  </td>
-                  <td>
-                    <Form.Control
-                      type="text"
-                      defaultValue={score.status || ""}
-                      onBlur={(e) =>
-                        updateScoreEntry(score.id, { status: e.target.value })
-                      }
-                    />
-                  </td>
-                  <td>
-                    <Button
-                      variant="primary"
-                      size="sm"
-                      onClick={() => updateScoreEntry(score.id, score)}
-                    >
-                      Save
-                    </Button>
-                  </td>
+              
                 </tr>
               ))}
             </tbody>
@@ -920,7 +1268,7 @@ function EditSubjectModal({
   const [avatar, setAvatar] = React.useState("");
   const [showAvatarModal, setShowAvatarModal] = React.useState(false);
 
-  // เมื่อ modal เปิดขึ้นและมี subject ให้ pre-populate ค่าในฟอร์ม
+  // Pre-populate ข้อมูลเดิมเมื่อ Modal เปิดขึ้นและ subject มีค่า
   React.useEffect(() => {
     if (subject) {
       setName(subject.name || "");
@@ -1015,7 +1363,6 @@ function EditSubjectModal({
   );
 }
 
-
 // Component: LoginBox (แสดงข้อมูลผู้ใช้)
 function LoginBox({ user, app }) {
   const [userData, setUserData] = React.useState(null);
@@ -1026,23 +1373,34 @@ function LoginBox({ user, app }) {
   React.useEffect(() => {
     if (user) {
       const userRef = db.collection("users").doc(user.uid);
+
       userRef.get().then((doc) => {
         if (doc.exists) {
+          // If user already exists, load their data
           const data = doc.data();
           setName(data.name || "");
           setEmail(data.email || "");
           setPhone(data.phone || "");
-        }
-      });
-    }
-  }, [user]);
+          setUserData(data);
+        } else {
+          // If user doesn't exist, create a new document
+          const newUser = {
+            uid: user.uid,
+            name: user.displayName || "", // Use default name if available
+            email: user.email || "",
+            phone: "", // Empty by default
+            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+          };
 
-  React.useEffect(() => {
-    if (user) {
-      const userRef = db.collection("users").doc(user.uid);
-      userRef.get().then((doc) => {
-        if (doc.exists) {
-          setUserData(doc.data());
+          userRef.set(newUser)
+            .then(() => {
+              console.log("New user added to Firestore");
+              setUserData(newUser);
+              setName(newUser.name);
+              setEmail(newUser.email);
+              setPhone(newUser.phone);
+            })
+            .catch((error) => console.error("Error adding new user:", error));
         }
       });
     }
@@ -1157,88 +1515,88 @@ function EditProfileButton({
 
   return (
     <>
-<Button
-  variant="light"
-  className="px-3 py-2 fw-bold rounded-pill shadow-sm border-0 text-dark position-absolute top-0 start-0 m-3"
-  style={{ backgroundColor: "#c7c7c7" }}
-  onClick={() => setShowModal(true)}
->
-  <i className="bi bi-pencil-square me-2"></i> Edit Profile
-</Button>
+      <Button
+        variant="light"
+        className="px-3 py-2 fw-bold rounded-pill shadow-sm border-0 text-dark position-absolute top-0 start-0 m-3"
+        style={{ backgroundColor: "#c7c7c7" }}
+        onClick={() => setShowModal(true)}
+      >
+        <i className="bi bi-pencil-square me-2"></i> Edit Profile
+      </Button>
 
-<Modal show={showModal} onHide={() => setShowModal(false)} centered>
-  <Modal.Header closeButton className="bg-transparent border-0">
-    <Modal.Title className="fw-bold text-dark">Edit Profile</Modal.Title>
-  </Modal.Header>
-  <Modal.Body className="p-4 rounded border-0" style={{
-    background: "#f8f9fa",
-    color: "#333",
-    boxShadow: "none"
-  }}>
-    <Form>
-      <Form.Group className="mb-3">
-        <Form.Label className="fw-semibold">Name:</Form.Label>
-        <Form.Control
-          type="text"
-          value={newName}
-          onChange={(e) => setNewName(e.target.value)}
-          placeholder="Enter your name"
-          className="shadow-sm border-0 rounded-3 px-3 py-2"
-        />
-      </Form.Group>
-      <Form.Group className="mb-3">
-        <Form.Label className="fw-semibold">Email:</Form.Label>
-        <Form.Control
-          type="email"
-          value={newEmail}
-          onChange={(e) => setNewEmail(e.target.value)}
-          placeholder="Enter your email"
-          className="shadow-sm border-0 rounded-3 px-3 py-2"
-        />
-      </Form.Group>
-      <Form.Group className="mb-3">
-        <Form.Label className="fw-semibold">Phone:</Form.Label>
-        <Form.Control
-          type="text"
-          value={newPhone}
-          onChange={(e) => setNewPhone(e.target.value)}
-          placeholder="Enter your phone number"
-          className="shadow-sm border-0 rounded-3 px-3 py-2"
-        />
-      </Form.Group>
-      <Form.Group className="mb-3">
-        <Form.Label className="fw-semibold">Select Default Profile Picture:</Form.Label>
-        <div className="d-flex flex-wrap justify-content-center">
-          {defaultImages.map((imgUrl, index) => (
-            <img
-              key={index}
-              src={imgUrl}
-              alt={`Default ${index}`}
-              className="rounded-circle border border-light shadow-sm mx-2"
-              style={{
-                width: "75px",
-                height: "75px",
-                objectFit: "cover",
-                cursor: "pointer",
-                transition: "all 0.2s ease-in-out",
-                border: newProfilePicture === imgUrl ? "4px solid #007bff" : "2px solid #ddd",
-                boxShadow: "0px 6px 10px rgba(0, 0, 0, 0.15)",
-              }}
-              onMouseOver={(e) => (e.target.style.transform = "scale(1.15)")}
-              onMouseOut={(e) => (e.target.style.transform = "scale(1)")}
-              onClick={() => setNewProfilePicture(imgUrl)}
-            />
-          ))}
-        </div>
-      </Form.Group>
-    </Form>
-  </Modal.Body>
-  <Modal.Footer className="bg-transparent border-0">
-    <Button variant="success" onClick={handleSave} className="px-4 py-2 fw-bold rounded-pill shadow-sm" style={{ backgroundColor: "#c7c7c7", borderColor: "#c7c7c7", color: "#fff" }}>
-      Save Changes
-    </Button>
-  </Modal.Footer>
-</Modal>
+      <Modal show={showModal} onHide={() => setShowModal(false)} centered>
+        <Modal.Header closeButton className="bg-transparent border-0">
+          <Modal.Title className="fw-bold text-dark">Edit Profile</Modal.Title>
+        </Modal.Header>
+        <Modal.Body className="p-4 rounded border-0" style={{
+          background: "#f8f9fa",
+          color: "#333",
+          boxShadow: "none"
+        }}>
+          <Form>
+            <Form.Group className="mb-3">
+              <Form.Label className="fw-semibold">Name:</Form.Label>
+              <Form.Control
+                type="text"
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                placeholder="Enter your name"
+                className="shadow-sm border-0 rounded-3 px-3 py-2"
+              />
+            </Form.Group>
+            <Form.Group className="mb-3">
+              <Form.Label className="fw-semibold">Email:</Form.Label>
+              <Form.Control
+                type="email"
+                value={newEmail}
+                onChange={(e) => setNewEmail(e.target.value)}
+                placeholder="Enter your email"
+                className="shadow-sm border-0 rounded-3 px-3 py-2"
+              />
+            </Form.Group>
+            <Form.Group className="mb-3">
+              <Form.Label className="fw-semibold">Phone:</Form.Label>
+              <Form.Control
+                type="text"
+                value={newPhone}
+                onChange={(e) => setNewPhone(e.target.value)}
+                placeholder="Enter your phone number"
+                className="shadow-sm border-0 rounded-3 px-3 py-2"
+              />
+            </Form.Group>
+            <Form.Group className="mb-3">
+              <Form.Label className="fw-semibold">Select Default Profile Picture:</Form.Label>
+              <div className="d-flex flex-wrap justify-content-center">
+                {defaultImages.map((imgUrl, index) => (
+                  <img
+                    key={index}
+                    src={imgUrl}
+                    alt={`Default ${index}`}
+                    className="rounded-circle border border-light shadow-sm mx-2"
+                    style={{
+                      width: "75px",
+                      height: "75px",
+                      objectFit: "cover",
+                      cursor: "pointer",
+                      transition: "all 0.2s ease-in-out",
+                      border: newProfilePicture === imgUrl ? "4px solid #007bff" : "2px solid #ddd",
+                      boxShadow: "0px 6px 10px rgba(0, 0, 0, 0.15)",
+                    }}
+                    onMouseOver={(e) => (e.target.style.transform = "scale(1.15)")}
+                    onMouseOut={(e) => (e.target.style.transform = "scale(1)")}
+                    onClick={() => setNewProfilePicture(imgUrl)}
+                  />
+                ))}
+              </div>
+            </Form.Group>
+          </Form>
+        </Modal.Body>
+        <Modal.Footer className="bg-transparent border-0">
+          <Button variant="success" onClick={handleSave} className="px-4 py-2 fw-bold rounded-pill shadow-sm" style={{ backgroundColor: "#c7c7c7", borderColor: "#c7c7c7", color: "#fff" }}>
+            Save Changes
+          </Button>
+        </Modal.Footer>
+      </Modal>
 
     </>
   );
@@ -1262,7 +1620,7 @@ const cors = require("cors");
 
 // 🔥 กำหนด CORS ให้ทุกโดเมนเข้าถึง API ได้
 const app = express();
-app.use(cors({ 
+app.use(cors({
   origin: "*",
   methods: ["GET", "POST", "DELETE"],
   allowedHeaders: ["Content-Type"]
@@ -1354,6 +1712,3 @@ app.delete("/users/:uid/classroom/:cid/question", async (req, res) => {
 app.listen(PORT, () => {
   console.log(`✅ Server running on port ${PORT}`);
 });
-
-
-
