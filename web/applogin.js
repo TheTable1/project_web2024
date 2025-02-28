@@ -510,7 +510,6 @@ function SubjectDetail({ subject, onBack, userId }) {
   const [showQuestionList, setShowQuestionList] = React.useState(false);
   const [questionList, setQuestionList] = React.useState([]);
   const [selectedQuestion, setSelectedQuestion] = React.useState(null);
-  const [checkinId, setCheckinId] = React.useState("");
 
   // สร้าง URL สำหรับรายละเอียดวิชา (ปรับเปลี่ยนได้ตามโปรเจค)
   const detailURL = `${subject.id}`;
@@ -765,16 +764,40 @@ function SubjectDetail({ subject, onBack, userId }) {
   };
 
   const handleViewQuestion = async (questionId) => {
+    
     try {
-
-
-
-
-
+      // Validate input
+      if (!userId || !subject?.id || !selectedCheckin || !questionId) {
+        console.error("Error: Firestore path values must be valid strings.");
+        return;
+      }
+  
+      // Firestore query
+      const questionDocRef = db
+        .collection("users")
+        .doc(userId)
+        .collection("classroom")
+        .doc(String(subject.id))
+        .collection("checkin")
+        .doc(selectedCheckin.id)
+        .collection("question")
+        .doc(questionId);
+  
+      const questionDoc = await questionDocRef.get();
+  
+      if (!questionDoc.exists) {
+        console.log("Question document does not exist.", questionId);
+        return;
+      }
+  
+      const questionData = { id: questionDoc.id, ...questionDoc.data() };
+  
+      setSelectedQuestion(questionData);
     } catch (error) {
-      console.error("Error fetching question document:", error);
+      console.error("Error fetching question document:",questionId, error);
     }
-  }
+  };
+  
 
   const handleupdateCheckinStatus = async (checkinId, newStatus) => {
     try {
@@ -843,6 +866,7 @@ function SubjectDetail({ subject, onBack, userId }) {
       .doc(checkinId)
       .collection("question")
       .get();
+
       console.log("questionSnap", questionSnap);
       if (questionSnap.empty) {
         console.log("No question found");
@@ -1284,12 +1308,12 @@ function SubjectDetail({ subject, onBack, userId }) {
                       <tr key={question.id}>
                         <td>{index + 1}</td>
                         <td>{question.question_text}</td>
-                        <td>{question.question_show}</td>
+                        <td>{question.question_show ? "✔️" : "❌"}</td>
                         <td>
                           <Button
                             variant="danger"
                             size="sm"
-                            onClick={() => handleQuestion(question.id)}
+                            onClick={() => handleViewQuestion(question.id)}
                           >
                             View
                           </Button>
@@ -1306,9 +1330,19 @@ function SubjectDetail({ subject, onBack, userId }) {
                     ))}
                   </tbody>
                 </Table>
+
+
             
 
 
+            </div>
+          )}
+          {selectedQuestion && (
+            <div className="mt-4 p-3 border rounded">
+              <h5>รายละเอียดคำถาม</h5>
+              <p>
+                <strong>คำถาม:</strong> {selectedQuestion.question_text}
+              </p>
             </div>
           )}
 
