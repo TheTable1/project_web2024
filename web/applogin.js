@@ -507,6 +507,10 @@ function SubjectDetail({ subject, onBack, userId }) {
   const [newCheckinCode, setNewCheckinCode] = React.useState("");
   const [selectedCheckin, setSelectedCheckin] = React.useState(null);
   const [studentCode, setStudentCode] = React.useState("");
+  const [showQuestionList, setShowQuestionList] = React.useState(false);
+  const [questionList, setQuestionList] = React.useState([]);
+  const [selectedQuestion, setSelectedQuestion] = React.useState(null);
+  const [checkinId, setCheckinId] = React.useState("");
 
   // สร้าง URL สำหรับรายละเอียดวิชา (ปรับเปลี่ยนได้ตามโปรเจค)
   const detailURL = `${subject.id}`;
@@ -760,6 +764,18 @@ function SubjectDetail({ subject, onBack, userId }) {
     }
   };
 
+  const handleViewQuestion = async (questionId) => {
+    try {
+
+
+
+
+
+    } catch (error) {
+      console.error("Error fetching question document:", error);
+    }
+  }
+
   const handleupdateCheckinStatus = async (checkinId, newStatus) => {
     try {
       const checkinDocRef = db
@@ -816,6 +832,35 @@ function SubjectDetail({ subject, onBack, userId }) {
     }
   };
 
+  const fetchquestionList = async (checkinId) => {
+    try{
+      const questionSnap = await db
+      .collection("users")
+      .doc(userId)
+      .collection("classroom")
+      .doc(subject.id)
+      .collection("checkin")
+      .doc(checkinId)
+      .collection("question")
+      .get();
+      console.log("questionSnap", questionSnap);
+      if (questionSnap.empty) {
+        console.log("No question found");
+        setQuestionList([]);
+        setShowQuestionList(true);
+        setShowStudentsList(false);
+        setShowScoresList(false);
+        return;
+      }
+
+      const questionData = questionSnap.docs.map((doc) => ({id: doc.id, ...doc.data()}));
+
+      setQuestionList(questionData);
+
+    }catch (error) {
+      console.error("Error fetching question:", error);
+    }
+  }
   // Toggle แสดงคะแนน (Realtime)
   const toggleScoresList = () => {
     if (!showScoresList) {
@@ -1188,6 +1233,15 @@ function SubjectDetail({ subject, onBack, userId }) {
             >
               ปิด
             </Button>
+            <Button
+              variant="danger"
+              onClick={() => {
+                fetchquestionList(selectedCheckin.id);
+                setShowQuestionList(true)
+              }}
+            >
+              คำถาม
+            </Button>
           </div>
           <Table striped bordered hover responsive>
             <thead className="table-dark">
@@ -1211,6 +1265,54 @@ function SubjectDetail({ subject, onBack, userId }) {
               ))}
             </tbody>
           </Table>
+
+          {showQuestionList && (
+            <div className="mt-4">
+                <h5>รายการคำถาม</h5>
+
+                <Table striped bordered hover responsive>
+                  <thead className="table-dark">
+                    <tr>
+                      <th>ลำดับ</th>
+                      <th>คำถาม</th>
+                      <th>แสดงคำถาม</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {questionList.map((question, index) => (
+                      <tr key={question.id}>
+                        <td>{index + 1}</td>
+                        <td>{question.question_text}</td>
+                        <td>{question.question_show}</td>
+                        <td>
+                          <Button
+                            variant="danger"
+                            size="sm"
+                            onClick={() => handleQuestion(question.id)}
+                          >
+                            View
+                          </Button>
+
+                          <Button
+                            variant="danger"
+                            size="sm"
+                            onClick={() => handleDeleteQuestion(question.id)}
+                          >
+                            Delete
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </Table>
+            
+
+
+            </div>
+          )}
+
+
         </div>
       )}
 
