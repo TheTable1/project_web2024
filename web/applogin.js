@@ -510,6 +510,13 @@ function SubjectDetail({ subject, onBack, userId }) {
   const [showQuestionList, setShowQuestionList] = React.useState(false);
   const [questionList, setQuestionList] = React.useState([]);
   const [selectedQuestion, setSelectedQuestion] = React.useState(null);
+  const [editingScore, setEditingScore] = React.useState(null);
+  const [newScore, setNewScore] = React.useState("");
+  const [newRemark, setNewRemark] = React.useState("");
+  const [newStatus, setNewStatus] = React.useState("");
+  const [newQuestion, setNewQuestion] = React.useState("");
+  const [questions, setQuestions] = React.useState([]);
+  const [answers,setAnswers] = React.useState([]);
 
   // สร้าง URL สำหรับรายละเอียดวิชา (ปรับเปลี่ยนได้ตามโปรเจค)
   const detailURL = `${subject.id}`;
@@ -621,34 +628,48 @@ function SubjectDetail({ subject, onBack, userId }) {
     }
 
     try {
-      // Get the latest check-in document to determine the next `cno`
       const checkinCollectionRef = db
         .collection("users")
         .doc(userId)
         .collection("classroom")
-        .doc(subject.id)
-        .collection("checkin");
+        .doc(subject.id);
 
+      // 🔹 Get the latest check-in document to determine the next `cno`
       const latestCheckinSnapshot = await checkinCollectionRef
+        .collection("checkin")
         .orderBy("cno", "desc")
         .limit(1)
         .get();
 
       let newCno = 1; // Default to 1 if no check-ins exist
-
       if (!latestCheckinSnapshot.empty) {
         const latestCheckin = latestCheckinSnapshot.docs[0].data();
         newCno = latestCheckin.cno + 1; // Increment `cno`
       }
 
-      // Add new check-in document
-      const newCheckinRef = checkinCollectionRef.doc(newCno.toString());
+      // 🔹 Add new check-in document
+      const newCheckinRef = checkinCollectionRef.collection("checkin").doc(newCno.toString());
       await newCheckinRef.set({
         cno: newCno,
         code: newCheckinCode.trim(),
         date: firebase.firestore.FieldValue.serverTimestamp(),
         status: 0, // Default to "Not started"
       });
+
+      // 🔹 Fetch students from classroom/students collection
+      const studentCollectionRef = await checkinCollectionRef.collection("students").get();
+
+      // 🔹 Copy each student to checkin/{newCno}/students
+      const checkinStudentCollection = newCheckinRef.collection("scores");
+
+      const batch = db.batch(); // Use batch to reduce writes
+      studentCollectionRef.forEach((studentDoc) => {
+        const studentData = studentDoc.data();
+        const studentRef = checkinStudentCollection.doc(studentDoc.id); // Keep the same student ID
+        batch.set(studentRef, studentData);
+      });
+
+      await batch.commit(); // Execute all writes at once
 
       setNewCheckinCode(""); // Clear input
       alert("เพิ่มเช็คชื่อสำเร็จ!");
@@ -763,15 +784,149 @@ function SubjectDetail({ subject, onBack, userId }) {
     }
   };
 
+  const handleDeletestudentinchekin = async (studentId) => {
+    const confirmDelete = window.confirm("คุณต้องการลบนักเรียนออกจากเช็คอินนี้หรือไม่?");
+    if (!confirmDelete) return; // Stop if user clicks 'No'
+
+    try {
+      const studentDocRef = db
+        .collection("users")
+        .doc(userId)
+        .collection("classroom")
+        .doc(subject.id)
+        .collection("checkin")
+        .doc(selectedCheckin.id)
+        .collection("students")
+        .doc(studentId);
+
+      await studentDocRef.delete();
+
+      // Update local state after deleting student in Firestore
+      setSelectedCheckin((prev) => {
+        if (!prev) return prev;
+        const updatedStudents = prev.students.filter((s) => s.id !== studentId);
+        return { ...prev, students: updatedStudents };
+      });
+
+      console.log("Student deleted from check-in:", studentId);
+    } catch (error) {
+      console.error("Error deleting student from check-in:", error);
+    }
+  };
+
+  const handleAddQuestion = async () => {
+    if (!newQuestion.trim()) {
+      alert("กรุณากรอกคำถาม");
+      return;
+    }
+  
+    try {
+      const questionCollectionRef = db
+        .collection("users")
+        .doc(userId)
+        .collection("classroom")
+        .doc(subject.id)
+        .collection("checkin")
+        .doc(selectedCheckin.id)
+        .collection("question");
+  
+      const answersCollectionRef = db
+        .collection("users")
+        .doc(userId)
+        .collection("classroom")
+        .doc(subject.id)
+        .collection("checkin")
+        .doc(selectedCheckin.id)
+        .collection("answers");
+  
+      // Step 1: Get the latest question document to determine the highest ID
+      const snapshot = await questionCollectionRef.orderBy("question_id", "desc").limit(1).get();
+  
+      let newId = 1; // Default ID in case there are no existing questions
+  
+      if (!snapshot.empty) {
+        const lastQuestion = snapshot.docs[0];
+        newId = lastQuestion.data().question_id + 1; // Increment the last used ID
+      }
+  
+      // Step 2: Add the new question with the incremented ID
+      const questionRef = questionCollectionRef.doc(String(newId));
+      await questionRef.set({
+        question_text: newQuestion.trim(),
+        question_show: true,
+        date: firebase.firestore.FieldValue.serverTimestamp(),
+        question_id: newId, // Store the incremented ID for reference
+      });
+  
+      // Step 3: Add an empty answer document with the same ID in the "answers" subcollection
+      const answerRef = answersCollectionRef.doc(String(newId));
+      await answerRef.set({
+        text: newQuestion.trim(),
+        date: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+  
+      alert("เพิ่มคำถามสำเร็จ!");
+  
+      setNewQuestion(""); // Clear the input after adding the question
+      fetchquestionList(selectedCheckin.id); // Refresh question list
+    } catch (error) {
+      console.error("Error adding question:", error);
+    }
+  };
+  
+  const handleOpenQuestion = async (questionId) => {
+    try {
+      await db
+        .collection("users")
+        .doc(userId)
+        .collection("classroom")
+        .doc(subject.id)
+        .collection("checkin")
+        .doc(selectedCheckin.id)
+        .collection("question")
+        .doc(questionId)
+        .update({
+          question_show: true, // Set to true for open
+        });
+  
+      alert("คำถามเปิดแล้ว!");
+      fetchquestionList(selectedCheckin.id); // Refresh question list after update
+    } catch (error) {
+      console.error("Error opening question:", error);
+    }
+  };
+  
+  const handleCloseQuestion = async (questionId) => {
+    try {
+      await db
+        .collection("users")
+        .doc(userId)
+        .collection("classroom")
+        .doc(subject.id)
+        .collection("checkin")
+        .doc(selectedCheckin.id)
+        .collection("question")
+        .doc(questionId)
+        .update({
+          question_show: false, // Set to false for close
+        });
+  
+      alert("คำถามปิดแล้ว!");
+      fetchquestionList(selectedCheckin.id); // Refresh question list after update
+    } catch (error) {
+      console.error("Error closing question:", error);
+    }
+  };
+
   const handleViewQuestion = async (questionId) => {
-    
+
     try {
       // Validate input
       if (!userId || !subject?.id || !selectedCheckin || !questionId) {
         console.error("Error: Firestore path values must be valid strings.");
         return;
       }
-  
+
       // Firestore query
       const questionDocRef = db
         .collection("users")
@@ -782,22 +937,62 @@ function SubjectDetail({ subject, onBack, userId }) {
         .doc(selectedCheckin.id)
         .collection("question")
         .doc(questionId);
-  
+
       const questionDoc = await questionDocRef.get();
-  
+
       if (!questionDoc.exists) {
         console.log("Question document does not exist.", questionId);
         return;
       }
-  
+
       const questionData = { id: questionDoc.id, ...questionDoc.data() };
-  
+
       setSelectedQuestion(questionData);
+      fetchAnswers();
     } catch (error) {
-      console.error("Error fetching question document:",questionId, error);
+      console.error("Error fetching question document:", questionId, error);
     }
   };
+
+  const handleDeleteQuestion = async (questionId) => {
+    if (!questionId) {
+      alert("Invalid question ID");
+      return;
+    }
   
+    try {
+      const questionRef = db
+        .collection("users")
+        .doc(userId)
+        .collection("classroom")
+        .doc(subject.id)
+        .collection("checkin")
+        .doc(selectedCheckin.id)
+        .collection("question")
+        .doc(questionId);
+  
+      const answerRef = db
+        .collection("users")
+        .doc(userId)
+        .collection("classroom")
+        .doc(subject.id)
+        .collection("checkin")
+        .doc(selectedCheckin.id)
+        .collection("answers")
+        .doc(questionId); // Same ID as the question
+  
+      // Delete both the question and its answer document
+      await questionRef.delete();
+      await answerRef.delete();
+  
+      alert("ลบคำถามเรียบร้อยแล้ว!");
+  
+      // Refresh question list
+      fetchquestionList(selectedCheckin.id);
+    } catch (error) {
+      console.error("Error deleting question:", error);
+    }
+  };  
 
   const handleupdateCheckinStatus = async (checkinId, newStatus) => {
     try {
@@ -820,6 +1015,55 @@ function SubjectDetail({ subject, onBack, userId }) {
     } catch (error) {
       console.error("Error updating check-in status:", error);
     }
+  };
+
+  const handleEditScore = (scoreId) => {
+    // Find the score from the list based on its ID
+    const scoreToEdit = scores.find(score => score.id === scoreId);
+  
+    if (scoreToEdit) {
+      // Populate the state with the existing score data to pre-fill the form
+      setEditingScore(scoreToEdit);
+      setNewScore(scoreToEdit.score || "");
+      setNewRemark(scoreToEdit.remark || "");
+      setNewStatus(scoreToEdit.status || "");
+    }
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingScore) return;
+  
+    // Prepare the updated data
+    const updatedData = {
+      score: newScore,
+      remark: newRemark,
+      status: newStatus,
+    };
+  
+    try {
+      // Update the score in the Firebase Firestore
+      await db
+        .collection("users")
+        .doc(userId)
+        .collection("classroom")
+        .doc(subject.id)
+        .collection("checkin")
+        .doc(selectedCheckin.id)
+        .collection("scores")
+        .doc(editingScore.id) // Use the editingScore's id to locate the document
+        .update(updatedData);
+  
+      // Close the edit modal or form
+      setEditingScore(null);
+      alert("Score updated successfully!");
+    } catch (error) {
+      console.error("Error updating score:", error);
+      alert("Error updating score.");
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setEditingScore(null); // Close the edit form without saving
   };
 
   const fetchCheckinList = async () => {
@@ -856,16 +1100,16 @@ function SubjectDetail({ subject, onBack, userId }) {
   };
 
   const fetchquestionList = async (checkinId) => {
-    try{
+    try {
       const questionSnap = await db
-      .collection("users")
-      .doc(userId)
-      .collection("classroom")
-      .doc(subject.id)
-      .collection("checkin")
-      .doc(checkinId)
-      .collection("question")
-      .get();
+        .collection("users")
+        .doc(userId)
+        .collection("classroom")
+        .doc(subject.id)
+        .collection("checkin")
+        .doc(checkinId)
+        .collection("question")
+        .get();
 
       console.log("questionSnap", questionSnap);
       if (questionSnap.empty) {
@@ -877,15 +1121,112 @@ function SubjectDetail({ subject, onBack, userId }) {
         return;
       }
 
-      const questionData = questionSnap.docs.map((doc) => ({id: doc.id, ...doc.data()}));
+      const questionData = questionSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
 
       setQuestionList(questionData);
 
-    }catch (error) {
+    } catch (error) {
       console.error("Error fetching question:", error);
     }
-  }
-  // Toggle แสดงคะแนน (Realtime)
+  };
+
+  const fetchScoreList = async () => {
+    try {
+      const scoreSnap = await db
+        .collection("users")
+        .doc(userId)
+        .collection("classroom")
+        .doc(subject.id)
+        .collection("checkin")
+        .doc(selectedCheckin.id)
+        .collection("scores")
+        .get();
+
+      if (scoreSnap.empty) {
+        console.log("No score found");
+        setScores([]);
+        return;
+      }
+
+      // ดึงข้อมูล score พร้อมกับข้อมูล userId และ date จาก `students` subcollection
+      const scoreData = await Promise.all(
+        scoreSnap.docs.map(async (doc) => {
+          const score = doc.data();
+          const userDoc = await db.collection("users").doc(doc.id).get();
+          console.log(`Fetching user ${doc.id}:`, userDoc.exists ? userDoc.data() : "Not found");
+
+          // ดึงข้อมูล date จาก `students` subcollection ของ userId
+          const studentDoc = await db
+            .collection("users")
+            .doc(userId) // ใช้ doc.id ซึ่งเป็น userId
+            .collection("classroom")
+            .doc(subject.id)
+            .collection("checkin")
+            .doc(selectedCheckin.id)
+            .collection("students")
+            .doc(doc.id) // ใช้ doc.id เป็น studentId
+            .get();
+
+          if (!studentDoc.exists) {
+            console.log(`Student doc for ${doc.id} not found`);
+          }
+
+          const studentDate = studentDoc.exists && studentDoc.data().date instanceof firebase.firestore.Timestamp
+            ? studentDoc.data().date.toDate().toLocaleString()
+            : "-"; // เช็คว่า `date` เป็น Timestamp ก่อนเรียก .toDate()
+
+          return {
+            id: doc.id,
+            ...score,
+            stid: userDoc.exists ? userDoc.data().stid : "-",
+            name: userDoc.exists ? userDoc.data().name : "-",
+            date: studentDate, // เพิ่ม date จาก students subcollection
+          };
+        })
+      );
+
+      // ตั้งค่า state เพื่อเก็บข้อมูล score ที่ดึงมา
+      setScores(scoreData);
+    } catch (error) {
+      console.error("Error fetching score:", error);
+    }
+  };
+
+  const fetchAnswers = async () => {
+    try {
+      const answersRef = db
+        .collection("users")
+        .doc(userId)
+        .collection("classroom")
+        .doc(subject.id)
+        .collection("checkin")
+        .doc(selectedCheckin.id)
+        .collection("answers")
+        .doc(selectedQuestion.id)
+        .collection("students");
+      
+      console.log("EEeeee",selectedQuestion.id)  
+
+      const snapshot = await answersRef.get();
+  
+      if (!snapshot.empty) {
+        const answersData = snapshot.docs.map(doc => ({
+          studentId: doc.id,
+          text: doc.data().text || "-", // The student's answer text
+          time: doc.data().time || "-", // The timestamp of the answer
+        }));
+        setAnswers(answersData); // Store the answers in state
+
+        console.log("Ans Example",answers)
+      } else {
+        console.log("No answers found");
+        setAnswers([]); // If no answers, reset the answers state
+      }
+    } catch (error) {
+      console.error("Error fetching answers:", error);
+    }
+  };
+
   const toggleScoresList = () => {
     if (!showScoresList) {
       const unsubscribe = db
@@ -1167,24 +1508,24 @@ function SubjectDetail({ subject, onBack, userId }) {
                   <td>
                     {checkin.date?.seconds
                       ? new Date(checkin.date.seconds * 1000).toLocaleString(
-                          "th-TH",
-                          {
-                            day: "2-digit",
-                            month: "2-digit",
-                            year: "numeric",
-                            hour: "2-digit",
-                            minute: "2-digit",
-                            hour12: false, // Ensure 24-hour format
-                          }
-                        )
+                        "th-TH",
+                        {
+                          day: "2-digit",
+                          month: "2-digit",
+                          year: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                          hour12: false, // Ensure 24-hour format
+                        }
+                      )
                       : "N/A"}
                   </td>
                   <td>
                     {checkin.status === 0
                       ? "ยังไม่เริ่ม"
                       : checkin.status === 1
-                      ? "กำลังเช็คชื่อ"
-                      : "เสร็จแล้ว"}
+                        ? "กำลังเช็คชื่อ"
+                        : "เสร็จแล้ว"}
                   </td>
                   <td>
                     <Button
@@ -1212,16 +1553,16 @@ function SubjectDetail({ subject, onBack, userId }) {
             <strong>เวลาเช็คชื่อ:</strong>{" "}
             {selectedCheckin.date?.seconds
               ? new Date(selectedCheckin.date.seconds * 1000).toLocaleString(
-                  "th-TH",
-                  {
-                    day: "2-digit",
-                    month: "2-digit",
-                    year: "numeric",
-                    hour: "2-digit",
-                    minute: "2-digit",
-                    hour12: false,
-                  }
-                )
+                "th-TH",
+                {
+                  day: "2-digit",
+                  month: "2-digit",
+                  year: "numeric",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                  hour12: false,
+                }
+              )
               : "N/A"}
           </p>
           <p>
@@ -1229,8 +1570,8 @@ function SubjectDetail({ subject, onBack, userId }) {
             {selectedCheckin.status === 0
               ? "ยังไม่เริ่ม"
               : selectedCheckin.status === 1
-              ? "กำลังเช็คชื่อ"
-              : "เสร็จแล้ว"}
+                ? "กำลังเช็คชื่อ"
+                : "เสร็จแล้ว"}
           </p>
           <div>
             <Button
@@ -1266,6 +1607,15 @@ function SubjectDetail({ subject, onBack, userId }) {
             >
               คำถาม
             </Button>
+            <Button
+              variant="danger"
+              onClick={() => {
+                fetchScoreList(selectedCheckin.id);
+                setShowScoresList(true)
+              }}
+            >
+              แสดงคะแนน
+            </Button>
           </div>
           <Table striped bordered hover responsive>
             <thead className="table-dark">
@@ -1275,6 +1625,7 @@ function SubjectDetail({ subject, onBack, userId }) {
                 <th>ชื่อ</th>
                 <th>หมายเหตุ</th>
                 <th>วันเวลา</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -1285,6 +1636,15 @@ function SubjectDetail({ subject, onBack, userId }) {
                   <td>{student.name || "-"}</td>
                   <td>{student.remark || "-"}</td>
                   <td>{student.date?.toDate().toLocaleString() || "-"}</td>
+                  <td>
+                    <Button
+                      variant="danger"
+                      size="sm"
+                      onClick={() => handleDeletestudentinchekin(student.id)}
+                    >
+                      Delete
+                    </Button>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -1292,59 +1652,191 @@ function SubjectDetail({ subject, onBack, userId }) {
 
           {showQuestionList && (
             <div className="mt-4">
-                <h5>รายการคำถาม</h5>
+              <h5>รายการคำถาม</h5>
+              <row>
+                <Col md={3}>
+                  <Form.Control
+                    type="text"
+                    value={newQuestion}
+                    onChange={(e) => setNewQuestion(e.target.value)}
+                    placeholder="Enter Question"
+                    className="mb-2"
+                  />
+                </Col>
+                <Col>
+                  <Button variant="success" onClick={handleAddQuestion}>
+                    Add Question
+                  </Button>
+                </Col>
+              </row>
 
-                <Table striped bordered hover responsive>
-                  <thead className="table-dark">
-                    <tr>
-                      <th>ลำดับ</th>
-                      <th>คำถาม</th>
-                      <th>แสดงคำถาม</th>
-                      <th>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {questionList.map((question, index) => (
-                      <tr key={question.id}>
-                        <td>{index + 1}</td>
-                        <td>{question.question_text}</td>
-                        <td>{question.question_show ? "✔️" : "❌"}</td>
-                        <td>
-                          <Button
-                            variant="danger"
-                            size="sm"
-                            onClick={() => handleViewQuestion(question.id)}
-                          >
-                            View
-                          </Button>
+              <Table striped bordered hover responsive>
+    <thead className="table-dark">
+      <tr>
+        <th>ลำดับ</th>
+        <th>คำถาม</th>
+        <th>แสดงคำถาม</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {questionList.map((question, index) => (
+        <tr key={question.id}>
+          <td>{index + 1}</td>
+          <td>{question.question_text}</td>
+          <td>{question.question_show ? "✔️" : "❌"}</td>
+          <td>
+            <Button
+              variant="danger"
+              size="sm"
+              onClick={() => handleViewQuestion(question.id)}
+            >
+              View
+            </Button>
 
-                          <Button
-                            variant="danger"
-                            size="sm"
-                            onClick={() => handleDeleteQuestion(question.id)}
-                          >
-                            Delete
-                          </Button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </Table>
+            <Button
+              variant="danger"
+              size="sm"
+              onClick={() => handleDeleteQuestion(question.id)}
+            >
+              Delete
+            </Button>
 
-
-            
-
+            {/* Open/Close Action Buttons */}
+            <Button
+              variant="success"
+              size="sm"
+              onClick={() => handleOpenQuestion(question.id)}
+            >
+              Open
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => handleCloseQuestion(question.id)}
+            >
+              Close
+            </Button>
+          </td>
+        </tr>
+      ))}
+    </tbody>
+  </Table>
 
             </div>
           )}
+
           {selectedQuestion && (
             <div className="mt-4 p-3 border rounded">
               <h5>รายละเอียดคำถาม</h5>
               <p>
                 <strong>คำถาม:</strong> {selectedQuestion.question_text}
               </p>
+
+              <Table striped bordered hover responsive>
+        <thead className="table-dark">
+          <tr>
+            <th>รหัสนักเรียน</th>
+            <th>คำตอบ</th>
+            <th>เวลา</th>
+          </tr>
+        </thead>
+        <tbody>
+          {answers.map((answer, index) => (
+            <tr key={index}>
+              <td>{answer.studentId}</td>
+              <td>{answer.text}</td>
+              <td>{answer.time.toDate().toLocaleString() || "-"}</td>
+            </tr>
+          ))}
+        </tbody>
+      </Table>
+
             </div>
           )}
+
+          {showScoresList && (
+            <div className="mt-4">
+              <h5>คะแนนผู้เช็คชื่อ</h5>
+              <Table striped bordered hover responsive>
+                <thead className="table-dark">
+                  <tr>
+                    <th>ลำดับ</th>
+                    <th>รหัส</th>
+                    <th>ชื่อ</th>
+                    <th>หมายเหตุ</th>
+                    <th>วันเวลา</th>
+                    <th>คะแนน</th>
+                    <th>สถานะ</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {scores.map((score, index) => {
+                    // Log the date to check its value
+                    console.log(score.date);
+
+                    return (
+                      <tr key={score.id}>
+                        <td>{index + 1}</td>
+                        <td>{score.stid || "-"}</td>
+                        <td>{score.name || "-"}</td>
+                        <td>{score.remark || "-"}</td>
+                        <td>
+                          {score.date}
+                        </td>
+                        <td>{score.score || "-"}</td>
+                        <td>{score.status || "-"}</td>
+                        <td>
+                          <Button
+                            variant="danger"
+                            size="sm"
+                            onClick={() => handleDeleteScore(score.id)}
+                          >
+                            Delete
+                          </Button>
+                          <Button
+                            variant="danger"
+                            size="sm"
+                            onClick={() => handleEditScore(score.id)}
+                          >
+                            Edit
+                          </Button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+
+              </Table>
+            </div>
+
+          )}
+
+{editingScore && (
+  <div className="edit-form">
+    <input
+      type="text"
+      value={newScore}
+      onChange={(e) => setNewScore(e.target.value)}
+      placeholder="Score"
+    />
+    <input
+      type="text"
+      value={newRemark}
+      onChange={(e) => setNewRemark(e.target.value)}
+      placeholder="Remark"
+    />
+    <input
+      type="text"
+      value={newStatus}
+      onChange={(e) => setNewStatus(e.target.value)}
+      placeholder="Status"
+    />
+    <button onClick={handleSaveEdit}>Save</button>
+    <button onClick={handleCancelEdit}>Cancel</button>
+  </div>
+)}
 
 
         </div>
