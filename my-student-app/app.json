@@ -13,9 +13,17 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSCameraUsageDescription": "แอปต้องการใช้กล้องเพื่อสแกน QR Code",
+        "NSPhotoLibraryUsageDescription": "This app needs access to your photo library.",
+        "NSPhotoLibraryAddUsageDescription": "This app needs permission to save photos."
+      }
     },
     "android": {
+      "permissions": [
+        "CAMERA"
+      ],
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
@@ -25,7 +33,12 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-barcode-scanner"
+      [
+         "expo-barcode-scanner",
+        {
+            "cameraPermission": "แอปนี้ต้องการใช้กล้องเพื่อสแกน QR Code"
+        }
+      ]
     ]
   }
 }
