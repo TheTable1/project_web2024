@@ -86,9 +86,7 @@ const HomeScreen = ({ navigation }) => {
       await setDoc(
         doc(db, `users/${ownerUid}/classroom/${cid}/students/${user.uid}`),
         {
-          stid: userData.stid,
-          name: userData.name,
-          email: userData.email,
+          status: 0, // เพิ่ม status โดยตั้งค่าเป็น 0 เสมอ
         }
       );
 
