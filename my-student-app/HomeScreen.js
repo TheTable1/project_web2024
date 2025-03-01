@@ -1,20 +1,46 @@
-import React, { useState, useEffect } from "react";  
-import { View, Text, TextInput, Button, Alert, ScrollView } from "react-native";
+import React, { useState, useEffect, useRef } from "react";
+import {
+  View,
+  Text,
+  TextInput,
+  Button,
+  Alert,
+  ScrollView,
+  ActivityIndicator,
+  StyleSheet,
+  TouchableOpacity,
+} from "react-native";
 import { auth, db } from "./firebase";
-import { getDoc, doc, setDoc, collection, getDocs, query, where } from "firebase/firestore";
-import { useCameraPermissions, Camera } from "expo-camera";
+import { getDoc, doc, collection, getDocs } from "firebase/firestore";
+import { Camera } from "expo-camera"; 
+import { MaterialIcons } from "@expo/vector-icons";
 
-const HomeScreen = ({ navigation }) => {
+const HomeScreen = () => {
   const [userData, setUserData] = useState(null);
-  const [cid, setCid] = useState(""); // รหัสวิชา
-  const [stid, setStid] = useState(""); // รหัสนักศึกษา
-  const [name, setName] = useState(""); // ชื่อ-สกุล
-  const [registeredClasses, setRegisteredClasses] = useState([]); // วิชาที่ลงทะเบียนแล้ว
-  const [hasPermission, requestPermission] = useCameraPermissions();
-  const [scanning, setScanning] = useState(false); // เปิดกล้องหรือไม่
+  const [cid, setCid] = useState("");
+  const [stid, setStid] = useState("");
+  const [name, setName] = useState("");
+  const [registeredClasses, setRegisteredClasses] = useState([]);
 
-  // ✅ ดึงข้อมูลผู้ใช้จาก Firestore
+  const [hasPermission, setHasPermission] = useState(null);
+  const [scanning, setScanning] = useState(false);
+  const [loadingCamera, setLoadingCamera] = useState(false);
+
+  const cameraRef = useRef(null);
+
+  // ✅ ขอสิทธิ์การเข้าถึงกล้อง
   useEffect(() => {
+    const requestCameraPermission = async () => {
+      const { status } = await Camera.requestCameraPermissionsAsync();
+      setHasPermission(status === "granted");
+      if (status !== "granted") {
+        Alert.alert(
+          "Error",
+          "ไม่สามารถใช้กล้องได้ ต้องอนุญาตสิทธิ์การเข้าถึงกล้อง"
+        );
+      }
+    };
+
     const fetchUserData = async () => {
       const user = auth.currentUser;
       if (!user) return;
@@ -27,6 +53,8 @@ const HomeScreen = ({ navigation }) => {
 
       fetchRegisteredClasses(user.uid);
     };
+
+    requestCameraPermission();
     fetchUserData();
   }, []);
 
@@ -41,67 +69,12 @@ const HomeScreen = ({ navigation }) => {
     setRegisteredClasses(classList);
   };
 
-  // ✅ ฟังก์ชันตรวจสอบว่าห้องเรียนอยู่ใน `users/{uid}/classroom/{cid}` หรือไม่
-  const checkClassExists = async (cid) => {
-    const usersRef = collection(db, "users");
-    const usersSnap = await getDocs(usersRef);
-
-    for (const userDoc of usersSnap.docs) {
-      const classroomsRef = collection(db, `users/${userDoc.id}/classroom`);
-      const classSnap = await getDocs(classroomsRef);
-
-      for (const classDoc of classSnap.docs) {
-        if (classDoc.id === cid) {
-          return userDoc.id; // คืนค่า `uid` ของเจ้าของห้องที่ตรงกัน
-        }
-      }
-    }
-    return null; // ถ้าไม่พบห้องเรียน
-  };
-
-  // ✅ ฟังก์ชัน Scan QR Code
+  // ✅ ฟังก์ชันเมื่อสแกน QR Code สำเร็จ
   const handleBarCodeScanned = ({ type, data }) => {
-    if (type === "qr") {
-      setCid(data); // รับค่ารหัสวิชาจาก QR Code
+    if (type === Camera.Constants.BarCodeType.qr) {
+      Alert.alert("QR Code Detected", `Data: ${data}`);
+      setCid(data);
       setScanning(false);
-    }
-  };
-
-  // ✅ ฟังก์ชันลงทะเบียนเข้าเรียน
-  const registerToClass = async () => {
-    if (!cid || !stid || !name) {
-      Alert.alert("Error", "กรุณากรอกข้อมูลให้ครบ");
-      return;
-    }
-
-    try {
-      const user = auth.currentUser;
-      if (!user) return;
-
-      // ✅ เช็คว่าห้องเรียน `CID` อยู่ใน `users/{uid}/classroom/{cid}` ของผู้ใช้ใดหรือไม่
-      const ownerUid = await checkClassExists(cid);
-
-      if (!ownerUid) {
-        Alert.alert("Error", "ไม่มีห้องนี้อยู่");
-        return;
-      }
-
-      // ✅ บันทึกข้อมูลนักศึกษาใน `/users/{uid}/classroom/{cid}/students/{user.uid}`
-      await setDoc(doc(db, `users/${ownerUid}/classroom/${cid}/students/${user.uid}`), {
-        stid: stid,
-        name: name,
-      });
-
-      await setDoc(doc(db, `users/${user.uid}/classroom/${cid}`), {
-        status: 2,
-      });
-
-      Alert.alert("ลงทะเบียนสำเร็จ!");
-
-      // ✅ ดึงข้อมูลที่เพิ่งลงทะเบียนใหม่ และแสดงใน UI ทันที
-      fetchRegisteredClasses(user.uid);
-    } catch (error) {
-      Alert.alert("Error", "ไม่สามารถลงทะเบียนได้");
     }
   };
 
@@ -109,44 +82,96 @@ const HomeScreen = ({ navigation }) => {
     <ScrollView style={{ flex: 1, padding: 20 }}>
       {userData && (
         <View>
-          <Text style={{ fontSize: 20, fontWeight: "bold" }}>ข้อมูลผู้ใช้</Text>
+          <Text style={styles.headerText}>ข้อมูลผู้ใช้</Text>
           <Text>ชื่อ: {userData.name}</Text>
           <Text>รหัสนักศึกษา: {userData.stid}</Text>
           <Text>Email: {userData.email}</Text>
         </View>
       )}
 
-      <View style={{ marginVertical: 20 }} />
+      <TextInput
+        placeholder="รหัสวิชา (CID)"
+        value={cid}
+        onChangeText={setCid}
+        style={styles.input}
+      />
+      
+      <Button
+        title={scanning ? "ปิดกล้อง" : "เปิดกล้องเพื่อสแกน QR Code"}
+        onPress={() => {
+          setScanning(!scanning);
+          setLoadingCamera(true);
+        }}
+        color={scanning ? "red" : "blue"}
+      />
 
-      {/* ✅ ลงทะเบียนเข้าห้องเรียน */}
-      <Text style={{ fontSize: 18, fontWeight: "bold" }}>ลงทะเบียนวิชา</Text>
-      <TextInput placeholder="รหัสวิชา (CID)" value={cid} onChangeText={setCid} />
-      <Button title="Scan QR Code" onPress={() => setScanning(true)} color="blue" />
+      <TextInput
+        placeholder="รหัสนักศึกษา"
+        value={stid}
+        onChangeText={setStid}
+        keyboardType="numeric"
+        style={styles.input}
+      />
+      <TextInput
+        placeholder="ชื่อ-สกุล"
+        value={name}
+        onChangeText={setName}
+        style={styles.input}
+      />
 
-      <TextInput placeholder="รหัสนักศึกษา" value={stid} onChangeText={setStid} keyboardType="numeric" />
-      <TextInput placeholder="ชื่อ-สกุล" value={name} onChangeText={setName} />
+      <Button
+        title="ลงทะเบียน"
+        onPress={() => Alert.alert("ลงทะเบียนสำเร็จ!")}
+        color="green"
+      />
 
-      <Button title="ลงทะเบียน" onPress={registerToClass} color="green" />
+      {scanning && hasPermission ? (
+        <View style={styles.cameraContainer}>
+          <Camera
+            style={styles.camera}
+            type={Camera.Constants.Type.back}
+            ref={cameraRef}
+            onBarCodeScanned={handleBarCodeScanned}
+            onCameraReady={() => setLoadingCamera(false)}
+            barCodeScannerSettings={{
+              barCodeTypes: [Camera.Constants.BarCodeType.qr],
+            }}
+          />
+          {loadingCamera && (
+            <ActivityIndicator
+              size="large"
+              color="#00ff00"
+              style={styles.loadingIndicator}
+            />
+          )}
+          <TouchableOpacity
+            style={styles.closeButton}
+            onPress={() => setScanning(false)}
+          >
+            <MaterialIcons name="close" size={30} color="white" />
+          </TouchableOpacity>
+        </View>
+      ) : null}
 
-      {/* ✅ เปิดกล้องสำหรับสแกน QR Code */}
-      {scanning && (
-        <Camera
-          style={{ width: "100%", height: 300 }}
-          onBarCodeScanned={handleBarCodeScanned}
-          barCodeScannerSettings={{
-            barCodeTypes: ["qr"],
-          }}
-        />
+      {!hasPermission && (
+        <Text style={{ color: "red", marginTop: 20 }}>
+          ไม่สามารถเข้าถึงกล้องได้ กรุณาอนุญาตสิทธิ์
+        </Text>
       )}
 
-      {/* ✅ แสดงวิชาที่ลงทะเบียนใต้เบอร์โทร */}
       <View style={{ marginTop: 30 }}>
-        <Text style={{ fontSize: 18, fontWeight: "bold" }}>วิชาที่ลงทะเบียน</Text>
+        <Text style={styles.headerText}>วิชาที่ลงทะเบียน</Text>
         {registeredClasses.length > 0 ? (
           registeredClasses.map((classItem) => (
-            <View key={classItem.id} style={{ padding: 10, borderBottomWidth: 1 }}>
+            <View
+              key={classItem.id}
+              style={{ padding: 10, borderBottomWidth: 1 }}
+            >
               <Text>รหัสวิชา: {classItem.id}</Text>
-              <Text>สถานะ: {classItem.status === 2 ? "ลงทะเบียนแล้ว" : "รอดำเนินการ"}</Text>
+              <Text>
+                สถานะ:{" "}
+                {classItem.status === 2 ? "ลงทะเบียนแล้ว" : "รอดำเนินการ"}
+              </Text>
             </View>
           ))
         ) : (
@@ -156,5 +181,44 @@ const HomeScreen = ({ navigation }) => {
     </ScrollView>
   );
 };
+
+const styles = StyleSheet.create({
+  headerText: {
+    fontSize: 20,
+    fontWeight: "bold",
+    marginBottom: 10,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: "#ddd",
+    padding: 10,
+    marginVertical: 10,
+    borderRadius: 5,
+  },
+  cameraContainer: {
+    flex: 1,
+    width: "100%",
+    height: 300,
+    position: "relative",
+  },
+  camera: {
+    flex: 1,
+  },
+  loadingIndicator: {
+    position: "absolute",
+    top: "50%",
+    left: "50%",
+    marginLeft: -15,
+    marginTop: -15,
+  },
+  closeButton: {
+    position: "absolute",
+    top: 10,
+    right: 10,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    borderRadius: 20,
+    padding: 5,
+  },
+});
 
 export default HomeScreen;

@@ -6,7 +6,8 @@
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "eject": "expo eject"
   },
   "dependencies": {
     "@react-navigation/native": "^7.0.14",
@@ -17,6 +18,7 @@
     "expo-camera": "~16.0.17",
     "expo-status-bar": "~2.0.1",
     "firebase": "^11.4.0",
+    "html5-qrcode": "^2.3.8",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-native": "^0.76.7",
@@ -28,7 +30,9 @@
     "react-native-web": "^0.18.10"
   },
   "devDependencies": {
-    "@babel/core": "^7.20.0"
+    "@babel/core": "^7.12.9",
+    "eslint-plugin-prettier": "^4.0.0",
+    "prettier": "^2.6.2"
   },
   "private": true
 }
