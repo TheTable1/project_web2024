@@ -8,10 +8,10 @@ const HomeScreen = ({ navigation }) => {
   const [userData, setUserData] = useState(null);
   const [cid, setCid] = useState(""); // รหัสวิชา
   const [registeredClasses, setRegisteredClasses] = useState([]); // วิชาที่ลงทะเบียนแล้ว
+  const [classNames, setClassNames] = useState({}); // เก็บชื่อวิชาตามรหัสวิชา
   const [hasPermission, requestPermission] = useCameraPermissions();
   const [scanning, setScanning] = useState(false); // เปิดกล้องหรือไม่
 
-  // ✅ ดึงข้อมูลผู้ใช้จาก Firestore
   useEffect(() => {
     const fetchUserData = async () => {
       const user = auth.currentUser;
@@ -24,11 +24,11 @@ const HomeScreen = ({ navigation }) => {
       }
 
       fetchRegisteredClasses(user.uid);
+      fetchClassNames();
     };
     fetchUserData();
   }, []);
 
-  // ✅ ดึงข้อมูลวิชาที่ลงทะเบียนไว้
   const fetchRegisteredClasses = async (uid) => {
     const classRef = collection(db, `users/${uid}/classroom`);
     const classSnap = await getDocs(classRef);
@@ -39,33 +39,34 @@ const HomeScreen = ({ navigation }) => {
     setRegisteredClasses(classList);
   };
 
-  // ✅ ฟังก์ชันตรวจสอบว่าห้องเรียนอยู่ใน `users/{uid}/classroom/{cid}` หรือไม่
-  const checkClassExists = async (cid) => {
+  const fetchClassNames = async () => {
     const usersRef = collection(db, "users");
     const usersSnap = await getDocs(usersRef);
+    const newClassNames = {};
 
     for (const userDoc of usersSnap.docs) {
       const classroomsRef = collection(db, `users/${userDoc.id}/classroom`);
       const classSnap = await getDocs(classroomsRef);
 
       for (const classDoc of classSnap.docs) {
-        if (classDoc.id === cid) {
-          return userDoc.id;
-        }
+        const classId = classDoc.id;
+        const classInfoRef = collection(
+          db,
+          `users/${userDoc.id}/classroom/${classId}/info`
+        );
+        const classInfoSnap = await getDocs(classInfoRef);
+
+        classInfoSnap.forEach((doc) => {
+          if (doc.exists()) {
+            newClassNames[classId] = doc.data().name;
+          }
+        });
       }
     }
-    return null;
+
+    setClassNames(newClassNames);
   };
 
-  // ✅ ฟังก์ชัน Scan QR Code
-  const handleBarCodeScanned = ({ type, data }) => {
-    if (type === "qr") {
-      setCid(data);
-      setScanning(false);
-    }
-  };
-
-  // ✅ ฟังก์ชันลงทะเบียนเข้าเรียน
   const registerToClass = async () => {
     if (!cid || !userData?.stid || !userData?.name) {
       Alert.alert("Error", "กรุณากรอกรหัสวิชาให้ครบ");
@@ -73,20 +74,42 @@ const HomeScreen = ({ navigation }) => {
     }
 
     try {
-      const user = auth.currentUser;
-      if (!user) return;
+      const usersRef = collection(db, "users");
+      const usersSnap = await getDocs(usersRef);
+      let classExists = false;
+      let ownerUid = null;
 
-      const ownerUid = await checkClassExists(cid);
+      for (const userDoc of usersSnap.docs) {
+        const classroomsRef = collection(db, `users/${userDoc.id}/classroom`);
+        const classSnap = await getDocs(classroomsRef);
 
-      if (!ownerUid) {
-        Alert.alert("Error", "ไม่มีห้องนี้อยู่");
+        for (const classDoc of classSnap.docs) {
+          if (classDoc.id === cid) {
+            classExists = true;
+            ownerUid = userDoc.id;
+            break;
+          }
+        }
+        if (classExists) break;
+      }
+
+      if (!classExists) {
+        Alert.alert("Error", "ไม่มีรหัสวิชานี้ในระบบ");
         return;
       }
+
+      const user = auth.currentUser;
+      if (!user) return;
 
       await setDoc(
         doc(db, `users/${ownerUid}/classroom/${cid}/students/${user.uid}`),
         {
-          status: 0, // เพิ่ม status โดยตั้งค่าเป็น 0 เสมอ
+          stid: userData.stid,
+          name: userData.name,
+          email: userData.email,
+          phone: userData.phone,
+          uid: user.uid,
+          status: 0,
         }
       );
 
@@ -97,6 +120,7 @@ const HomeScreen = ({ navigation }) => {
       Alert.alert("ลงทะเบียนสำเร็จ!");
 
       fetchRegisteredClasses(user.uid);
+      fetchClassNames();
     } catch (error) {
       Alert.alert("Error", "ไม่สามารถลงทะเบียนได้");
     }
@@ -110,56 +134,35 @@ const HomeScreen = ({ navigation }) => {
           <Text>ชื่อ: {userData.name}</Text>
           <Text>รหัสนักศึกษา: {userData.stid}</Text>
           <Text>Email: {userData.email}</Text>
+          <Text>Phone: {userData.phone}</Text>
         </View>
       )}
 
       <View style={{ marginVertical: 20 }} />
 
-      <Text style={{ fontSize: 18, fontWeight: "bold" }}>ลงทะเบียนวิชา</Text>
+      <Text style={{ fontSize: 18, fontWeight: "bold" }}>วิชาที่ลงทะเบียน</Text>
+      {registeredClasses.length > 0 ? (
+        registeredClasses.map((classItem) => (
+          <View
+            key={classItem.id}
+            style={{ padding: 10, borderBottomWidth: 1 }}
+          >
+            <Text>ชื่อวิชา: {classNames[classItem.id] || "ไม่พบชื่อวิชา"}</Text>
+            <Text>
+              สถานะ: {classItem.status === 2 ? "ลงทะเบียนแล้ว" : "รอดำเนินการ"}
+            </Text>
+          </View>
+        ))
+      ) : (
+        <Text>ยังไม่มีการลงทะเบียน</Text>
+      )}
+
       <TextInput
         placeholder="รหัสวิชา (CID)"
         value={cid}
         onChangeText={setCid}
       />
-      <Button
-        title="Scan QR Code"
-        onPress={() => setScanning(true)}
-        color="blue"
-      />
-
       <Button title="ลงทะเบียน" onPress={registerToClass} color="green" />
-
-      {scanning && (
-        <Camera
-          style={{ width: "100%", height: 300 }}
-          onBarCodeScanned={handleBarCodeScanned}
-          barCodeScannerSettings={{
-            barCodeTypes: ["qr"],
-          }}
-        />
-      )}
-
-      <View style={{ marginTop: 30 }}>
-        <Text style={{ fontSize: 18, fontWeight: "bold" }}>
-          วิชาที่ลงทะเบียน
-        </Text>
-        {registeredClasses.length > 0 ? (
-          registeredClasses.map((classItem) => (
-            <View
-              key={classItem.id}
-              style={{ padding: 10, borderBottomWidth: 1 }}
-            >
-              <Text>รหัสวิชา: {classItem.id}</Text>
-              <Text>
-                สถานะ:{" "}
-                {classItem.status === 2 ? "ลงทะเบียนแล้ว" : "รอดำเนินการ"}
-              </Text>
-            </View>
-          ))
-        ) : (
-          <Text>ยังไม่มีการลงทะเบียน</Text>
-        )}
-      </View>
     </ScrollView>
   );
 };

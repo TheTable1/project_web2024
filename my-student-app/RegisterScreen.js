@@ -1,33 +1,42 @@
-import React, { useState } from "react"; 
+import React, { useState } from "react";
 import { View, Text, TextInput, Button, Alert } from "react-native";
 import { auth, db } from "./firebase";
-import { createUserWithEmailAndPassword, signInWithPhoneNumber, RecaptchaVerifier } from "firebase/auth";
+import {
+  createUserWithEmailAndPassword,
+  signInWithPhoneNumber,
+  RecaptchaVerifier,
+} from "firebase/auth";
 import { setDoc, doc } from "firebase/firestore";
 
 const RegisterScreen = ({ navigation }) => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [name, setName] = useState(""); // ✅ เปลี่ยนจาก fullName เป็น name
-  const [stid, setStid] = useState(""); // ✅ เพิ่มฟิลด์รหัสนักศึกษา
+  const [name, setName] = useState("");
+  const [stid, setStid] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [verificationId, setVerificationId] = useState(null);
   const [otpCode, setOtpCode] = useState("");
 
   // ✅ ฟังก์ชันสมัครสมาชิกด้วย Email/Password
   const handleRegister = async () => {
-    if (!email || !password || !name || !stid) {
+    if (!email || !password || !name || !stid || !phoneNumber) {
       Alert.alert("Error", "กรุณากรอกข้อมูลให้ครบถ้วน");
       return;
     }
 
     try {
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const userCredential = await createUserWithEmailAndPassword(
+        auth,
+        email,
+        password
+      );
       const user = userCredential.user;
 
       await setDoc(doc(db, "users", user.uid), {
-        name,   // ✅ เปลี่ยนจาก fullName เป็น name
-        stid,  // ✅ เพิ่มรหัสนักศึกษา
+        name,
+        stid,
         email,
+        phone: phoneNumber, // ✅ เพิ่มการบันทึกหมายเลขโทรศัพท์
         uid: user.uid,
         createdAt: new Date().toISOString(),
       });
@@ -47,8 +56,16 @@ const RegisterScreen = ({ navigation }) => {
     }
 
     try {
-      const recaptchaVerifier = new RecaptchaVerifier(auth, "recaptcha-container", { size: "invisible" });
-      const confirmation = await signInWithPhoneNumber(auth, phoneNumber, recaptchaVerifier);
+      const recaptchaVerifier = new RecaptchaVerifier(
+        auth,
+        "recaptcha-container",
+        { size: "invisible" }
+      );
+      const confirmation = await signInWithPhoneNumber(
+        auth,
+        phoneNumber,
+        recaptchaVerifier
+      );
       setVerificationId(confirmation.verificationId);
       Alert.alert("OTP ถูกส่งแล้ว กรุณากรอก OTP ที่ได้รับ");
     } catch (error) {
@@ -64,14 +81,17 @@ const RegisterScreen = ({ navigation }) => {
     }
 
     try {
-      const credential = auth.PhoneAuthProvider.credential(verificationId, otpCode);
+      const credential = auth.PhoneAuthProvider.credential(
+        verificationId,
+        otpCode
+      );
       const userCredential = await auth.signInWithCredential(credential);
       const user = userCredential.user;
 
       await setDoc(doc(db, "users", user.uid), {
-        name,   // ✅ บันทึกชื่อที่สมัครผ่าน OTP
-        stid,   // ✅ บันทึกรหัสนักศึกษา
-        phoneNumber,
+        name,
+        stid,
+        phone: phoneNumber, // ✅ บันทึกหมายเลขโทรศัพท์
         uid: user.uid,
         createdAt: new Date().toISOString(),
       });
@@ -85,27 +105,60 @@ const RegisterScreen = ({ navigation }) => {
 
   return (
     <View style={{ flex: 1, justifyContent: "center", padding: 20 }}>
-      <Text style={{ fontSize: 22, fontWeight: "bold", marginBottom: 10 }}>สมัครสมาชิก</Text>
+      <Text style={{ fontSize: 22, fontWeight: "bold", marginBottom: 10 }}>
+        สมัครสมาชิก
+      </Text>
 
-      {/* ✅ สมัครสมาชิกด้วย Email/Password */}
       <TextInput placeholder="ชื่อเต็ม" value={name} onChangeText={setName} />
-      <TextInput placeholder="รหัสนักศึกษา" value={stid} onChangeText={setStid} keyboardType="numeric" />
-      <TextInput placeholder="Email" value={email} onChangeText={setEmail} keyboardType="email-address" />
-      <TextInput placeholder="Password" value={password} onChangeText={setPassword} secureTextEntry />
+      <TextInput
+        placeholder="รหัสนักศึกษา"
+        value={stid}
+        onChangeText={setStid}
+        keyboardType="numeric"
+      />
+      <TextInput
+        placeholder="Email"
+        value={email}
+        onChangeText={setEmail}
+        keyboardType="email-address"
+      />
+      <TextInput
+        placeholder="Password"
+        value={password}
+        onChangeText={setPassword}
+        secureTextEntry
+      />
+      <TextInput
+        placeholder="Phone"
+        value={phoneNumber}
+        onChangeText={setPhoneNumber}
+        keyboardType="phone-pad"
+      />
       <Button title="สมัครด้วย Email" onPress={handleRegister} color="green" />
 
       <View style={{ marginVertical: 20 }} />
 
-      {/* ✅ สมัครสมาชิกด้วย OTP */}
-      <TextInput placeholder="Phone Number (+66xxxxxxxxx)" value={phoneNumber} onChangeText={setPhoneNumber} keyboardType="phone-pad" />
+      <TextInput
+        placeholder="Phone Number (+66xxxxxxxxx)"
+        value={phoneNumber}
+        onChangeText={setPhoneNumber}
+        keyboardType="phone-pad"
+      />
       <Button title="ส่ง OTP" onPress={sendOtp} />
-      <TextInput placeholder="OTP Code" value={otpCode} onChangeText={setOtpCode} keyboardType="numeric" />
+      <TextInput
+        placeholder="OTP Code"
+        value={otpCode}
+        onChangeText={setOtpCode}
+        keyboardType="numeric"
+      />
       <Button title="ยืนยัน OTP" onPress={verifyOtp} color="blue" />
 
       <View id="recaptcha-container"></View>
 
-      {/* ปุ่มย้อนกลับไปหน้า Login */}
-      <Button title="กลับไปที่เข้าสู่ระบบ" onPress={() => navigation.navigate("Login")} />
+      <Button
+        title="กลับไปที่เข้าสู่ระบบ"
+        onPress={() => navigation.navigate("Login")}
+      />
     </View>
   );
 };
