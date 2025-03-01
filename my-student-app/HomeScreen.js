@@ -1,14 +1,12 @@
-import React, { useState, useEffect } from "react";  
+import React, { useState, useEffect } from "react";
 import { View, Text, TextInput, Button, Alert, ScrollView } from "react-native";
 import { auth, db } from "./firebase";
-import { getDoc, doc, setDoc, collection, getDocs, query, where } from "firebase/firestore";
+import { getDoc, doc, setDoc, collection, getDocs } from "firebase/firestore";
 import { useCameraPermissions, Camera } from "expo-camera";
 
 const HomeScreen = ({ navigation }) => {
   const [userData, setUserData] = useState(null);
   const [cid, setCid] = useState(""); // รหัสวิชา
-  const [stid, setStid] = useState(""); // รหัสนักศึกษา
-  const [name, setName] = useState(""); // ชื่อ-สกุล
   const [registeredClasses, setRegisteredClasses] = useState([]); // วิชาที่ลงทะเบียนแล้ว
   const [hasPermission, requestPermission] = useCameraPermissions();
   const [scanning, setScanning] = useState(false); // เปิดกล้องหรือไม่
@@ -52,25 +50,25 @@ const HomeScreen = ({ navigation }) => {
 
       for (const classDoc of classSnap.docs) {
         if (classDoc.id === cid) {
-          return userDoc.id; // คืนค่า `uid` ของเจ้าของห้องที่ตรงกัน
+          return userDoc.id;
         }
       }
     }
-    return null; // ถ้าไม่พบห้องเรียน
+    return null;
   };
 
   // ✅ ฟังก์ชัน Scan QR Code
   const handleBarCodeScanned = ({ type, data }) => {
     if (type === "qr") {
-      setCid(data); // รับค่ารหัสวิชาจาก QR Code
+      setCid(data);
       setScanning(false);
     }
   };
 
   // ✅ ฟังก์ชันลงทะเบียนเข้าเรียน
   const registerToClass = async () => {
-    if (!cid || !stid || !name) {
-      Alert.alert("Error", "กรุณากรอกข้อมูลให้ครบ");
+    if (!cid || !userData?.stid || !userData?.name) {
+      Alert.alert("Error", "กรุณากรอกรหัสวิชาให้ครบ");
       return;
     }
 
@@ -78,7 +76,6 @@ const HomeScreen = ({ navigation }) => {
       const user = auth.currentUser;
       if (!user) return;
 
-      // ✅ เช็คว่าห้องเรียน `CID` อยู่ใน `users/{uid}/classroom/{cid}` ของผู้ใช้ใดหรือไม่
       const ownerUid = await checkClassExists(cid);
 
       if (!ownerUid) {
@@ -86,11 +83,14 @@ const HomeScreen = ({ navigation }) => {
         return;
       }
 
-      // ✅ บันทึกข้อมูลนักศึกษาใน `/users/{uid}/classroom/{cid}/students/{user.uid}`
-      await setDoc(doc(db, `users/${ownerUid}/classroom/${cid}/students/${user.uid}`), {
-        stid: stid,
-        name: name,
-      });
+      await setDoc(
+        doc(db, `users/${ownerUid}/classroom/${cid}/students/${user.uid}`),
+        {
+          stid: userData.stid,
+          name: userData.name,
+          email: userData.email,
+        }
+      );
 
       await setDoc(doc(db, `users/${user.uid}/classroom/${cid}`), {
         status: 2,
@@ -98,7 +98,6 @@ const HomeScreen = ({ navigation }) => {
 
       Alert.alert("ลงทะเบียนสำเร็จ!");
 
-      // ✅ ดึงข้อมูลที่เพิ่งลงทะเบียนใหม่ และแสดงใน UI ทันที
       fetchRegisteredClasses(user.uid);
     } catch (error) {
       Alert.alert("Error", "ไม่สามารถลงทะเบียนได้");
@@ -118,17 +117,20 @@ const HomeScreen = ({ navigation }) => {
 
       <View style={{ marginVertical: 20 }} />
 
-      {/* ✅ ลงทะเบียนเข้าห้องเรียน */}
       <Text style={{ fontSize: 18, fontWeight: "bold" }}>ลงทะเบียนวิชา</Text>
-      <TextInput placeholder="รหัสวิชา (CID)" value={cid} onChangeText={setCid} />
-      <Button title="Scan QR Code" onPress={() => setScanning(true)} color="blue" />
-
-      <TextInput placeholder="รหัสนักศึกษา" value={stid} onChangeText={setStid} keyboardType="numeric" />
-      <TextInput placeholder="ชื่อ-สกุล" value={name} onChangeText={setName} />
+      <TextInput
+        placeholder="รหัสวิชา (CID)"
+        value={cid}
+        onChangeText={setCid}
+      />
+      <Button
+        title="Scan QR Code"
+        onPress={() => setScanning(true)}
+        color="blue"
+      />
 
       <Button title="ลงทะเบียน" onPress={registerToClass} color="green" />
 
-      {/* ✅ เปิดกล้องสำหรับสแกน QR Code */}
       {scanning && (
         <Camera
           style={{ width: "100%", height: 300 }}
@@ -139,14 +141,21 @@ const HomeScreen = ({ navigation }) => {
         />
       )}
 
-      {/* ✅ แสดงวิชาที่ลงทะเบียนใต้เบอร์โทร */}
       <View style={{ marginTop: 30 }}>
-        <Text style={{ fontSize: 18, fontWeight: "bold" }}>วิชาที่ลงทะเบียน</Text>
+        <Text style={{ fontSize: 18, fontWeight: "bold" }}>
+          วิชาที่ลงทะเบียน
+        </Text>
         {registeredClasses.length > 0 ? (
           registeredClasses.map((classItem) => (
-            <View key={classItem.id} style={{ padding: 10, borderBottomWidth: 1 }}>
+            <View
+              key={classItem.id}
+              style={{ padding: 10, borderBottomWidth: 1 }}
+            >
               <Text>รหัสวิชา: {classItem.id}</Text>
-              <Text>สถานะ: {classItem.status === 2 ? "ลงทะเบียนแล้ว" : "รอดำเนินการ"}</Text>
+              <Text>
+                สถานะ:{" "}
+                {classItem.status === 2 ? "ลงทะเบียนแล้ว" : "รอดำเนินการ"}
+              </Text>
             </View>
           ))
         ) : (
