@@ -505,6 +505,9 @@ function SubjectDetail({ subject, onBack, userId }) {
   const [checkinList, setCheckinList] = React.useState([]);
   const [showCheckinList, setShowCheckinList] = React.useState(false);
   const [newCheckinCode, setNewCheckinCode] = React.useState("");
+  const [newCheckinStudent, setNewCheckinStudent] = React.useState("");
+  const [newCheckinStudentRemark, setNewCheckinStudentRemark] = React.useState("");
+  const [newCheckinValidcode, setNewCheckinValidcode] = React.useState("");
   const [selectedCheckin, setSelectedCheckin] = React.useState(null);
   const [studentCode, setStudentCode] = React.useState("");
   const [showQuestionList, setShowQuestionList] = React.useState(false);
@@ -515,8 +518,8 @@ function SubjectDetail({ subject, onBack, userId }) {
   const [newRemark, setNewRemark] = React.useState("");
   const [newStatus, setNewStatus] = React.useState("");
   const [newQuestion, setNewQuestion] = React.useState("");
-  const [questions, setQuestions] = React.useState([]);
-  const [answers,setAnswers] = React.useState([]);
+  const [answers, setAnswers] = React.useState([]);
+
 
   // สร้าง URL สำหรับรายละเอียดวิชา (ปรับเปลี่ยนได้ตามโปรเจค)
   const detailURL = `${subject.id}`;
@@ -779,9 +782,90 @@ function SubjectDetail({ subject, onBack, userId }) {
         console.log("No students found in this check-in.");
         setSelectedCheckin({ ...checkinData, students: [] });
       }
+
+      setShowScoresList(false);
+
     } catch (error) {
       console.error("Error fetching check-in document or students:", error);
     }
+  };
+
+  const handleAddCheckinStudent = async () => {
+    if (!newCheckinStudent.trim() || !newCheckinStudentRemark.trim() || !newCheckinValidcode.trim()) {
+      alert("กรุณากรอกให้ครบ");
+      return;
+    }
+  
+    try {
+      const checkinRef = db
+        .collection("users")
+        .doc(userId)
+        .collection("classroom")
+        .doc(subject.id)
+        .collection("checkin")
+        .doc(selectedCheckin.id);
+  
+      // Fetch the valid code from Firestore
+      const checkinDoc = await checkinRef.get();
+      if (!checkinDoc.exists) {
+        alert("ไม่พบข้อมูลเช็คชื่อ");
+        return;
+      }
+  
+      const validCode = checkinDoc.data().code;
+      if (newCheckinValidcode !== validCode) {
+        alert("รหัสยืนยันไม่ถูกต้อง");
+        return;
+      }
+  
+      // Proceed to add the student after validation
+      const checkinStudentRef = checkinRef
+        .collection("students")
+        .doc(newCheckinStudent);
+  
+      await checkinStudentRef.set({
+        remark: newCheckinStudentRemark,
+        date: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+  
+      alert("เพิ่มนักเรียนเช็คชื่อสำเร็จ!");
+  
+      // Clear input fields
+      setNewCheckinStudent("");
+      setNewCheckinStudentRemark("");
+      setNewCheckinValidcode("");
+      handleViewCheckin(selectedCheckin.id)
+  
+    } catch (error) {
+      console.error("Error adding check-in student:", error);
+    }
+  };
+
+  const handleDeleteCheckin = (checkinId) => {
+    if (!checkinId) {
+      alert("Invalid Checkin ID");
+      return;
+    }
+
+    try {
+      const checkinRef = db
+        .collection("users")
+        .doc(userId)
+        .collection("classroom")
+        .doc(subject.id)
+        .collection("checkin")
+        .doc(checkinId);
+
+      checkinRef.delete();
+
+      alert("ลบการเช็คชื่่อเรียบร้อยแล้ว!");
+      fetchCheckinList();
+
+
+
+
+    } catch (error) { }
+
   };
 
   const handleDeletestudentinchekin = async (studentId) => {
@@ -819,7 +903,7 @@ function SubjectDetail({ subject, onBack, userId }) {
       alert("กรุณากรอกคำถาม");
       return;
     }
-  
+
     try {
       const questionCollectionRef = db
         .collection("users")
@@ -829,7 +913,7 @@ function SubjectDetail({ subject, onBack, userId }) {
         .collection("checkin")
         .doc(selectedCheckin.id)
         .collection("question");
-  
+
       const answersCollectionRef = db
         .collection("users")
         .doc(userId)
@@ -838,17 +922,17 @@ function SubjectDetail({ subject, onBack, userId }) {
         .collection("checkin")
         .doc(selectedCheckin.id)
         .collection("answers");
-  
+
       // Step 1: Get the latest question document to determine the highest ID
       const snapshot = await questionCollectionRef.orderBy("question_id", "desc").limit(1).get();
-  
+
       let newId = 1; // Default ID in case there are no existing questions
-  
+
       if (!snapshot.empty) {
         const lastQuestion = snapshot.docs[0];
         newId = lastQuestion.data().question_id + 1; // Increment the last used ID
       }
-  
+
       // Step 2: Add the new question with the incremented ID
       const questionRef = questionCollectionRef.doc(String(newId));
       await questionRef.set({
@@ -857,23 +941,23 @@ function SubjectDetail({ subject, onBack, userId }) {
         date: firebase.firestore.FieldValue.serverTimestamp(),
         question_id: newId, // Store the incremented ID for reference
       });
-  
+
       // Step 3: Add an empty answer document with the same ID in the "answers" subcollection
       const answerRef = answersCollectionRef.doc(String(newId));
       await answerRef.set({
         text: newQuestion.trim(),
         date: firebase.firestore.FieldValue.serverTimestamp(),
       });
-  
+
       alert("เพิ่มคำถามสำเร็จ!");
-  
+
       setNewQuestion(""); // Clear the input after adding the question
       fetchquestionList(selectedCheckin.id); // Refresh question list
     } catch (error) {
       console.error("Error adding question:", error);
     }
   };
-  
+
   const handleOpenQuestion = async (questionId) => {
     try {
       await db
@@ -888,14 +972,14 @@ function SubjectDetail({ subject, onBack, userId }) {
         .update({
           question_show: true, // Set to true for open
         });
-  
+
       alert("คำถามเปิดแล้ว!");
       fetchquestionList(selectedCheckin.id); // Refresh question list after update
     } catch (error) {
       console.error("Error opening question:", error);
     }
   };
-  
+
   const handleCloseQuestion = async (questionId) => {
     try {
       await db
@@ -910,7 +994,7 @@ function SubjectDetail({ subject, onBack, userId }) {
         .update({
           question_show: false, // Set to false for close
         });
-  
+
       alert("คำถามปิดแล้ว!");
       fetchquestionList(selectedCheckin.id); // Refresh question list after update
     } catch (error) {
@@ -959,7 +1043,7 @@ function SubjectDetail({ subject, onBack, userId }) {
       alert("Invalid question ID");
       return;
     }
-  
+
     try {
       const questionRef = db
         .collection("users")
@@ -970,7 +1054,7 @@ function SubjectDetail({ subject, onBack, userId }) {
         .doc(selectedCheckin.id)
         .collection("question")
         .doc(questionId);
-  
+
       const answerRef = db
         .collection("users")
         .doc(userId)
@@ -980,19 +1064,19 @@ function SubjectDetail({ subject, onBack, userId }) {
         .doc(selectedCheckin.id)
         .collection("answers")
         .doc(questionId); // Same ID as the question
-  
+
       // Delete both the question and its answer document
       await questionRef.delete();
       await answerRef.delete();
-  
+
       alert("ลบคำถามเรียบร้อยแล้ว!");
-  
+
       // Refresh question list
       fetchquestionList(selectedCheckin.id);
     } catch (error) {
       console.error("Error deleting question:", error);
     }
-  };  
+  };
 
   const handleupdateCheckinStatus = async (checkinId, newStatus) => {
     try {
@@ -1020,7 +1104,7 @@ function SubjectDetail({ subject, onBack, userId }) {
   const handleEditScore = (scoreId) => {
     // Find the score from the list based on its ID
     const scoreToEdit = scores.find(score => score.id === scoreId);
-  
+
     if (scoreToEdit) {
       // Populate the state with the existing score data to pre-fill the form
       setEditingScore(scoreToEdit);
@@ -1032,14 +1116,14 @@ function SubjectDetail({ subject, onBack, userId }) {
 
   const handleSaveEdit = async () => {
     if (!editingScore) return;
-  
+
     // Prepare the updated data
     const updatedData = {
       score: newScore,
       remark: newRemark,
       status: newStatus,
     };
-  
+
     try {
       // Update the score in the Firebase Firestore
       await db
@@ -1052,7 +1136,7 @@ function SubjectDetail({ subject, onBack, userId }) {
         .collection("scores")
         .doc(editingScore.id) // Use the editingScore's id to locate the document
         .update(updatedData);
-  
+
       // Close the edit modal or form
       setEditingScore(null);
       alert("Score updated successfully!");
@@ -1204,11 +1288,11 @@ function SubjectDetail({ subject, onBack, userId }) {
         .collection("answers")
         .doc(selectedQuestion.id)
         .collection("students");
-      
-      console.log("EEeeee",selectedQuestion.id)  
+
+      console.log("EEeeee", selectedQuestion.id)
 
       const snapshot = await answersRef.get();
-  
+
       if (!snapshot.empty) {
         const answersData = snapshot.docs.map(doc => ({
           studentId: doc.id,
@@ -1217,7 +1301,7 @@ function SubjectDetail({ subject, onBack, userId }) {
         }));
         setAnswers(answersData); // Store the answers in state
 
-        console.log("Ans Example",answers)
+        console.log("Ans Example", answers)
       } else {
         console.log("No answers found");
         setAnswers([]); // If no answers, reset the answers state
@@ -1535,6 +1619,13 @@ function SubjectDetail({ subject, onBack, userId }) {
                     >
                       View
                     </Button>
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={() => handleDeleteCheckin(checkin.id)}
+                    >
+                      Delete
+                    </Button>
                   </td>
                 </tr>
               ))}
@@ -1616,6 +1707,39 @@ function SubjectDetail({ subject, onBack, userId }) {
             >
               แสดงคะแนน
             </Button>
+
+            <Row className="mb-3">
+              <Col md={3}>
+                <Form.Control
+                  type="text"
+                  value={newCheckinStudent}
+                  onChange={(e) => setNewCheckinStudent(e.target.value)}
+                  placeholder="Enter student ID"
+                />
+              </Col>
+              <Col md={3}>
+                <Form.Control
+                  type="text"
+                  value={newCheckinStudentRemark}
+                  onChange={(e) => setNewCheckinStudentRemark(e.target.value)}
+                  placeholder="Enter student Remark"
+                />
+              </Col>
+              <Col md={3}>
+                <Form.Control
+                  type="text"
+                  value={newCheckinValidcode}
+                  onChange={(e) => setNewCheckinValidcode(e.target.value)}
+                  placeholder="Enter Valid Code"
+                />
+              </Col>
+              <Col>
+              <Button variant="success" onClick={handleAddCheckinStudent}>
+                Add Student
+              </Button>
+              </Col>
+            </Row>
+
           </div>
           <Table striped bordered hover responsive>
             <thead className="table-dark">
@@ -1671,57 +1795,57 @@ function SubjectDetail({ subject, onBack, userId }) {
               </row>
 
               <Table striped bordered hover responsive>
-    <thead className="table-dark">
-      <tr>
-        <th>ลำดับ</th>
-        <th>คำถาม</th>
-        <th>แสดงคำถาม</th>
-        <th>Actions</th>
-      </tr>
-    </thead>
-    <tbody>
-      {questionList.map((question, index) => (
-        <tr key={question.id}>
-          <td>{index + 1}</td>
-          <td>{question.question_text}</td>
-          <td>{question.question_show ? "✔️" : "❌"}</td>
-          <td>
-            <Button
-              variant="danger"
-              size="sm"
-              onClick={() => handleViewQuestion(question.id)}
-            >
-              View
-            </Button>
+                <thead className="table-dark">
+                  <tr>
+                    <th>ลำดับ</th>
+                    <th>คำถาม</th>
+                    <th>แสดงคำถาม</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {questionList.map((question, index) => (
+                    <tr key={question.id}>
+                      <td>{index + 1}</td>
+                      <td>{question.question_text}</td>
+                      <td>{question.question_show ? "✔️" : "❌"}</td>
+                      <td>
+                        <Button
+                          variant="danger"
+                          size="sm"
+                          onClick={() => handleViewQuestion(question.id)}
+                        >
+                          View
+                        </Button>
 
-            <Button
-              variant="danger"
-              size="sm"
-              onClick={() => handleDeleteQuestion(question.id)}
-            >
-              Delete
-            </Button>
+                        <Button
+                          variant="danger"
+                          size="sm"
+                          onClick={() => handleDeleteQuestion(question.id)}
+                        >
+                          Delete
+                        </Button>
 
-            {/* Open/Close Action Buttons */}
-            <Button
-              variant="success"
-              size="sm"
-              onClick={() => handleOpenQuestion(question.id)}
-            >
-              Open
-            </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => handleCloseQuestion(question.id)}
-            >
-              Close
-            </Button>
-          </td>
-        </tr>
-      ))}
-    </tbody>
-  </Table>
+                        {/* Open/Close Action Buttons */}
+                        <Button
+                          variant="success"
+                          size="sm"
+                          onClick={() => handleOpenQuestion(question.id)}
+                        >
+                          Open
+                        </Button>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => handleCloseQuestion(question.id)}
+                        >
+                          Close
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </Table>
 
             </div>
           )}
@@ -1734,23 +1858,23 @@ function SubjectDetail({ subject, onBack, userId }) {
               </p>
 
               <Table striped bordered hover responsive>
-        <thead className="table-dark">
-          <tr>
-            <th>รหัสนักเรียน</th>
-            <th>คำตอบ</th>
-            <th>เวลา</th>
-          </tr>
-        </thead>
-        <tbody>
-          {answers.map((answer, index) => (
-            <tr key={index}>
-              <td>{answer.studentId}</td>
-              <td>{answer.text}</td>
-              <td>{answer.time.toDate().toLocaleString() || "-"}</td>
-            </tr>
-          ))}
-        </tbody>
-      </Table>
+                <thead className="table-dark">
+                  <tr>
+                    <th>รหัสนักเรียน</th>
+                    <th>คำตอบ</th>
+                    <th>เวลา</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {answers.map((answer, index) => (
+                    <tr key={index}>
+                      <td>{answer.studentId}</td>
+                      <td>{answer.text}</td>
+                      <td>{answer.time.toDate().toLocaleString() || "-"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </Table>
 
             </div>
           )}
@@ -1813,30 +1937,30 @@ function SubjectDetail({ subject, onBack, userId }) {
 
           )}
 
-{editingScore && (
-  <div className="edit-form">
-    <input
-      type="text"
-      value={newScore}
-      onChange={(e) => setNewScore(e.target.value)}
-      placeholder="Score"
-    />
-    <input
-      type="text"
-      value={newRemark}
-      onChange={(e) => setNewRemark(e.target.value)}
-      placeholder="Remark"
-    />
-    <input
-      type="text"
-      value={newStatus}
-      onChange={(e) => setNewStatus(e.target.value)}
-      placeholder="Status"
-    />
-    <button onClick={handleSaveEdit}>Save</button>
-    <button onClick={handleCancelEdit}>Cancel</button>
-  </div>
-)}
+          {editingScore && (
+            <div className="edit-form">
+              <input
+                type="text"
+                value={newScore}
+                onChange={(e) => setNewScore(e.target.value)}
+                placeholder="Score"
+              />
+              <input
+                type="text"
+                value={newRemark}
+                onChange={(e) => setNewRemark(e.target.value)}
+                placeholder="Remark"
+              />
+              <input
+                type="text"
+                value={newStatus}
+                onChange={(e) => setNewStatus(e.target.value)}
+                placeholder="Status"
+              />
+              <button onClick={handleSaveEdit}>Save</button>
+              <button onClick={handleCancelEdit}>Cancel</button>
+            </div>
+          )}
 
 
         </div>
