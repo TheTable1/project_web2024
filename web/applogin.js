@@ -2018,18 +2018,18 @@ function SubjectDetail({ subject, onBack, userId }) {
 // Component: SubjectAvatarSelector (Modal สำหรับเลือกรูปอวตารของวิชา)
 function SubjectAvatarSelector({ show, onSelect, onClose, currentAvatar }) {
   const defaultAvatars = [
-    "/web/default-subject.jpg",
-    "/web/default-subject1.jpg",
-    "/web/default-subject2.jpg",
-    "/web/default-subject3.jpg",
-    "/web/default-subject4.jpg",
-    "/web/default-subject5.jpg",
-    "/web/default-subject6.jpg",
-    "/web/default-subject7.jpg",
-    "/web/default-subject8.jpg",
-    "/web/default-subject9.jpg",
-    "/web/default-subject10.jpg",
-    "/web/default-subject11.jpg",
+    "/project_web2024/web/default-subject.jpg",
+    "/project_web2024/web/default-subject1.jpg",
+    "/project_web2024/web/default-subject2.jpg",
+    "/project_web2024/web/default-subject3.jpg",
+    "/project_web2024/web/default-subject4.jpg",
+    "/project_web2024/web/default-subject5.jpg",
+    "/project_web2024/web/default-subject6.jpg",
+    "/project_web2024/web/default-subject7.jpg",
+    "/project_web2024/web/default-subject8.jpg",
+    "/project_web2024/web/default-subject9.jpg",
+    "/project_web2024/web/default-subject10.jpg",
+    "/project_web2024/web/default-subject11.jpg",
   ];
   return (
     <Modal show={show} onHide={onClose} centered>
