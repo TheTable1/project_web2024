@@ -1,5 +1,13 @@
 import React, { useState, useEffect } from "react";
-import { View, Text, TextInput, Button, Alert, ScrollView } from "react-native";
+import {
+  View,
+  Text,
+  TextInput,
+  Button,
+  Alert,
+  ScrollView,
+  TouchableOpacity,
+} from "react-native";
 import { auth, db } from "./firebase";
 import { getDoc, doc, setDoc, collection, getDocs } from "firebase/firestore";
 import { useCameraPermissions, Camera } from "expo-camera";
@@ -33,9 +41,9 @@ const HomeScreen = ({ navigation }) => {
     const classRef = collection(db, `users/${uid}/classroom`);
     const classSnap = await getDocs(classRef);
 
-    const classList = classSnap.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
+    const classList = classSnap.docs.map((docSnap) => ({
+      id: docSnap.id,
+      ...docSnap.data(),
     }));
 
     setRegisteredClasses(classList);
@@ -83,13 +91,25 @@ const HomeScreen = ({ navigation }) => {
       const user = auth.currentUser;
       if (!user) return;
 
-      const ownerUid = Object.keys(classNames).find((id) => id === cid);
+      // ค้นหา ownerUid โดยค้นหาจากทุก user ที่มี document classroom ที่มี id ตรงกับ cid
+      let ownerUid = null;
+      const usersRef = collection(db, "users");
+      const usersSnap = await getDocs(usersRef);
+      for (const userDoc of usersSnap.docs) {
+        const classroomsRef = collection(db, `users/${userDoc.id}/classroom`);
+        const classSnap = await getDocs(classroomsRef);
+        if (classSnap.docs.find((docSnap) => docSnap.id === cid)) {
+          ownerUid = userDoc.id;
+          break;
+        }
+      }
 
       if (!ownerUid) {
         Alert.alert("Error", "ไม่มีรหัสวิชานี้ในระบบ");
         return;
       }
 
+      // บันทึกข้อมูลในส่วนของเจ้าของห้อง (นักศึกษาในห้องเรียน)
       await setDoc(
         doc(db, `users/${ownerUid}/classroom/${cid}/students/${user.uid}`),
         {
@@ -102,8 +122,10 @@ const HomeScreen = ({ navigation }) => {
         }
       );
 
+      // บันทึกข้อมูลในส่วนของผู้ใช้ (วิชาที่ลงทะเบียน) พร้อมกับบันทึก ownerUid เพื่อใช้ในการนำทางไปยัง DetailScreen
       await setDoc(doc(db, `users/${user.uid}/classroom/${cid}`), {
         status: 2,
+        ownerUid: ownerUid,
       });
 
       Alert.alert("ลงทะเบียนสำเร็จ!");
@@ -112,6 +134,7 @@ const HomeScreen = ({ navigation }) => {
       fetchClassNames();
     } catch (error) {
       Alert.alert("Error", "ไม่สามารถลงทะเบียนได้");
+      console.error("Register error: ", error);
     }
   };
 
@@ -129,18 +152,25 @@ const HomeScreen = ({ navigation }) => {
         <Text>กำลังโหลดข้อมูล...</Text>
       )}
 
-      <Text style={{ fontSize: 18, fontWeight: "bold" }}>วิชาที่ลงทะเบียน</Text>
+      <Text style={{ fontSize: 18, fontWeight: "bold", marginTop: 20 }}>
+        วิชาที่ลงทะเบียน
+      </Text>
       {registeredClasses.length > 0 ? (
         registeredClasses.map((classItem) => (
-          <View
+          <TouchableOpacity
             key={classItem.id}
             style={{ padding: 10, borderBottomWidth: 1 }}
+            onPress={() => {
+              navigation.navigate("DetailScreen", {
+                classId: classItem.id, // ส่งรหัสวิชาไป
+              });
+            }}
           >
             <Text>ชื่อวิชา: {classNames[classItem.id] || "ไม่พบชื่อวิชา"}</Text>
             <Text>
               สถานะ: {classItem.status === 2 ? "ลงทะเบียนแล้ว" : "รอดำเนินการ"}
             </Text>
-          </View>
+          </TouchableOpacity>
         ))
       ) : (
         <Text>ยังไม่มีการลงทะเบียน</Text>
@@ -150,6 +180,7 @@ const HomeScreen = ({ navigation }) => {
         placeholder="รหัสวิชา (CID)"
         value={cid}
         onChangeText={setCid}
+        style={{ borderWidth: 1, marginVertical: 10, padding: 5 }}
       />
       <Button
         title="Scan QR Code"
@@ -160,7 +191,7 @@ const HomeScreen = ({ navigation }) => {
 
       {scanning && (
         <Camera
-          style={{ width: "100%", height: 300 }}
+          style={{ width: "100%", height: 300, marginTop: 10 }}
           onBarCodeScanned={handleBarCodeScanned}
         />
       )}
