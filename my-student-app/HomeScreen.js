@@ -14,64 +14,89 @@ import { useCameraPermissions, Camera } from "expo-camera";
 
 const HomeScreen = ({ navigation }) => {
   const [userData, setUserData] = useState(null);
-  const [cid, setCid] = useState(""); // รหัสวิชา
-  const [registeredClasses, setRegisteredClasses] = useState([]); // วิชาที่ลงทะเบียนแล้ว
+  const [cid, setCid] = useState(""); // รหัสวิชา (สำหรับการลงทะเบียนด้วย QR หรือกรอกด้วยมือ)
+  const [registeredClasses, setRegisteredClasses] = useState([]); // รายวิชาที่นักศึกษาอยู่ในห้องเรียน
   const [classNames, setClassNames] = useState({}); // เก็บชื่อวิชาตามรหัสวิชา
   const [hasPermission, requestPermission] = useCameraPermissions();
-  const [scanning, setScanning] = useState(false); // เปิดกล้องหรือไม่
+  const [scanning, setScanning] = useState(false); // สำหรับเปิดกล้อง QR
 
   useEffect(() => {
     const fetchUserData = async () => {
       const user = auth.currentUser;
       if (!user) return;
 
+      // ดึงข้อมูลของนักศึกษา
       const userRef = doc(db, "users", user.uid);
       const userSnap = await getDoc(userRef);
       if (userSnap.exists()) {
         setUserData(userSnap.data());
       }
 
+      // ดึงรายวิชาที่นักศึกษาลงทะเบียนอยู่จากทุกผู้ใช้
       fetchRegisteredClasses(user.uid);
+      // ดึงชื่อวิชาจากส่วน info/details ของแต่ละ classroom
       fetchClassNames();
     };
     fetchUserData();
   }, []);
 
+  // ฟังก์ชันนี้จะวนลูปในทุก user และทุก classroom เพื่อตรวจสอบว่าใน subcollection "students"
+  // มี document ที่มี id ตรงกับ id ของผู้ใช้ที่ล็อกอินหรือไม่
   const fetchRegisteredClasses = async (uid) => {
-    const classRef = collection(db, `users/${uid}/classroom`);
-    const classSnap = await getDocs(classRef);
-
-    const classList = classSnap.docs.map((docSnap) => ({
-      id: docSnap.id,
-      ...docSnap.data(),
-    }));
-
-    setRegisteredClasses(classList);
-  };
-
-  const fetchClassNames = async () => {
+    const registered = [];
     const usersRef = collection(db, "users");
     const usersSnap = await getDocs(usersRef);
-    const newClassNames = {};
 
     for (const userDoc of usersSnap.docs) {
-      const classroomsRef = collection(db, `users/${userDoc.id}/classroom`);
+      const ownerUid = userDoc.id;
+      const classroomsRef = collection(db, `users/${ownerUid}/classroom`);
       const classSnap = await getDocs(classroomsRef);
 
       for (const classDoc of classSnap.docs) {
         const classId = classDoc.id;
-        const classInfoRef = doc(
+        const studentDocRef = doc(
           db,
-          `users/${userDoc.id}/classroom/${classId}/info/details`
+          `users/${ownerUid}/classroom/${classId}/students`,
+          uid
         );
-        const classInfoSnap = await getDoc(classInfoRef);
-
-        if (classInfoSnap.exists()) {
-          newClassNames[classId] = classInfoSnap.data().name;
+        const studentSnap = await getDoc(studentDocRef);
+        if (studentSnap.exists()) {
+          const studentData = studentSnap.data();
+          registered.push({
+            ownerUid,
+            id: classId,
+            status: studentData.status, // status: 0 หรือ 1
+          });
         }
       }
     }
-    setClassNames(newClassNames);
+    setRegisteredClasses(registered);
+  };
+
+  // ดึงชื่อวิชาจาก info/details ของแต่ละ classroom จากทุกผู้ใช้
+  const fetchClassNames = async () => {
+    const names = {};
+    const usersRef = collection(db, "users");
+    const usersSnap = await getDocs(usersRef);
+
+    for (const userDoc of usersSnap.docs) {
+      const ownerUid = userDoc.id;
+      const classroomsRef = collection(db, `users/${ownerUid}/classroom`);
+      const classSnap = await getDocs(classroomsRef);
+
+      for (const classDoc of classSnap.docs) {
+        const classId = classDoc.id;
+        const detailsRef = doc(
+          db,
+          `users/${ownerUid}/classroom/${classId}/info/details`
+        );
+        const detailsSnap = await getDoc(detailsRef);
+        if (detailsSnap.exists()) {
+          names[classId] = detailsSnap.data().name;
+        }
+      }
+    }
+    setClassNames(names);
   };
 
   const handleBarCodeScanned = ({ type, data }) => {
@@ -81,6 +106,7 @@ const HomeScreen = ({ navigation }) => {
     }
   };
 
+  // ฟังก์ชันสำหรับลงทะเบียนวิชา (ยังคงใช้ได้ตามเดิม)
   const registerToClass = async () => {
     if (!cid || !userData?.stid || !userData?.name) {
       Alert.alert("Error", "กรุณากรอกรหัสวิชาให้ครบ");
@@ -91,7 +117,7 @@ const HomeScreen = ({ navigation }) => {
       const user = auth.currentUser;
       if (!user) return;
 
-      // ค้นหา ownerUid โดยค้นหาจากทุก user ที่มี document classroom ที่มี id ตรงกับ cid
+      // ค้นหา ownerUid จากทุก user ที่มี classroom ที่มี id ตรงกับ cid
       let ownerUid = null;
       const usersRef = collection(db, "users");
       const usersSnap = await getDocs(usersRef);
@@ -109,9 +135,9 @@ const HomeScreen = ({ navigation }) => {
         return;
       }
 
-      // บันทึกข้อมูลในส่วนของเจ้าของห้อง (นักศึกษาในห้องเรียน)
+      // บันทึกข้อมูลในส่วนของเจ้าของห้อง (เพิ่มนักศึกษาใน subcollection "students")
       await setDoc(
-        doc(db, `users/${ownerUid}/classroom/${cid}/students/${user.uid}`),
+        doc(db, `users/${ownerUid}/classroom/${cid}/students`, user.uid),
         {
           status: 0,
           stid: userData.stid,
@@ -122,7 +148,7 @@ const HomeScreen = ({ navigation }) => {
         }
       );
 
-      // บันทึกข้อมูลในส่วนของผู้ใช้ (วิชาที่ลงทะเบียน) พร้อมกับบันทึก ownerUid เพื่อใช้ในการนำทางไปยัง DetailScreen
+      // บันทึกข้อมูลในส่วนของผู้ใช้ (วิชาที่ลงทะเบียน) พร้อมกับบันทึก ownerUid เพื่อใช้อ้างอิงในภายหลัง
       await setDoc(doc(db, `users/${user.uid}/classroom/${cid}`), {
         status: 2,
         ownerUid: ownerUid,
@@ -130,6 +156,7 @@ const HomeScreen = ({ navigation }) => {
 
       Alert.alert("ลงทะเบียนสำเร็จ!");
 
+      // อัพเดตรายวิชาที่นักศึกษาอยู่
       fetchRegisteredClasses(user.uid);
       fetchClassNames();
     } catch (error) {
@@ -162,13 +189,19 @@ const HomeScreen = ({ navigation }) => {
             style={{ padding: 10, borderBottomWidth: 1 }}
             onPress={() => {
               navigation.navigate("DetailScreen", {
-                classId: classItem.id, // ส่งรหัสวิชาไป
+                classId: classItem.id, // ส่งรหัสวิชาไปยัง DetailScreen
+                ownerUid: classItem.ownerUid,
               });
             }}
           >
             <Text>ชื่อวิชา: {classNames[classItem.id] || "ไม่พบชื่อวิชา"}</Text>
             <Text>
-              สถานะ: {classItem.status === 2 ? "ลงทะเบียนแล้ว" : "รอดำเนินการ"}
+              สถานะ:{" "}
+              {classItem.status === 0
+                ? "รอดำเนินการ"
+                : classItem.status === 1
+                ? "ลงทะเบียนแล้ว"
+                : "ไม่ทราบสถานะ"}
             </Text>
           </TouchableOpacity>
         ))

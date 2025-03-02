@@ -6,7 +6,7 @@ import { db } from "./firebase";
 // ฟังก์ชันสำหรับแมป path รูปที่เป็น local
 const getLocalImage = (path) => {
   switch (path) {
-    // กรณีใน database photo เก็บเป็น "/web/default-avatar5.jpg"
+    // กรณีใน database photo เก็บเป็น "/web/default-subject.jpg" เป็นต้น
     case "/web/default-subject.jpg":
       return require("./assets/default-subject.jpg");
     case "/web/default-subject1.jpg":
@@ -37,6 +37,7 @@ const getLocalImage = (path) => {
 const DetailScreen = ({ route }) => {
   const { classId } = route.params; // รับรหัสวิชาที่ส่งมาจาก HomeScreen
   const [classDetails, setClassDetails] = useState(null);
+  const [ownerName, setOwnerName] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -46,6 +47,7 @@ const DetailScreen = ({ route }) => {
         const usersRef = collection(db, "users");
         const usersSnap = await getDocs(usersRef);
         let foundDetails = null;
+        let foundOwnerUid = null;
 
         // วนลูปในแต่ละผู้ใช้เพื่อตรวจสอบว่าใน collection classroom มี document ของวิชานี้หรือไม่
         for (const userDoc of usersSnap.docs) {
@@ -56,10 +58,21 @@ const DetailScreen = ({ route }) => {
           const detailsSnap = await getDoc(detailsRef);
           if (detailsSnap.exists()) {
             foundDetails = detailsSnap.data();
+            foundOwnerUid = userDoc.id; // เก็บ ownerUid จากผู้ใช้ที่เจอข้อมูลวิชานี้
             break; // เมื่อเจอข้อมูลแล้วหยุดการวนลูป
           }
         }
+
         setClassDetails(foundDetails);
+
+        // ถ้าเจอ ownerUid ให้ดึงชื่อเจ้าของห้องจาก /users/{ownerUid}/name
+        if (foundOwnerUid) {
+          const ownerRef = doc(db, "users", foundOwnerUid);
+          const ownerSnap = await getDoc(ownerRef);
+          if (ownerSnap.exists()) {
+            setOwnerName(ownerSnap.data().name);
+          }
+        }
       } catch (error) {
         console.error("Error fetching class details: ", error);
       } finally {
@@ -108,6 +121,9 @@ const DetailScreen = ({ route }) => {
         ชื่อวิชา: {classDetails.name || "-"}
       </Text>
       <Text style={{ marginBottom: 5 }}>ห้อง: {classDetails.room || "-"}</Text>
+      {ownerName && (
+        <Text style={{ marginBottom: 5 }}>อาจารย์: {ownerName}</Text>
+      )}
       {imageSource ? (
         <Image
           source={imageSource}
