@@ -10,6 +10,7 @@ import {
   StatusBar,
   ScrollView,
   Dimensions,
+  TextInput,
 } from "react-native";
 import {
   auth,
@@ -37,6 +38,8 @@ const HomeScreen = ({ navigation }) => {
   const [scanning, setScanning] = useState(false);
   const [scanned, setScanned] = useState(false);
   const [permission, requestPermission] = useCameraPermissions();
+  // state สำหรับกรอกรหัสห้อง
+  const [roomCode, setRoomCode] = useState("");
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -70,8 +73,8 @@ const HomeScreen = ({ navigation }) => {
     setLoading(false);
   };
 
-  // ฟังก์ชันนี้จะวนลูปในทุกผู้ใช้และทุก classroom เพื่อตรวจสอบว่ามี document ใน subcollection "students"
-  // ที่มี id ตรงกับผู้ใช้ที่ล็อกอินหรือไม่ (ดึง status จาก document นั้น)
+  // วนลูปในทุกผู้ใช้และทุก classroom เพื่อตรวจสอบว่ามี document ใน subcollection "students"
+  // ที่มี id ตรงกับผู้ใช้ที่ล็อกอิน (ดึง status จาก document นั้น)
   const fetchRegisteredClasses = async (uid) => {
     const registered = [];
     try {
@@ -94,7 +97,7 @@ const HomeScreen = ({ navigation }) => {
             registered.push({
               ownerUid,
               id: classId,
-              status: studentData.status, // 0 หรือ 1
+              status: studentData.status, // 0: กำลังดำเนินการ, 1: ลงทะเบียนแล้ว
               timestamp: classDoc.data().timestamp || null,
             });
           }
@@ -134,25 +137,63 @@ const HomeScreen = ({ navigation }) => {
     setClassNames(names);
   };
 
-  // ฟังก์ชันสำหรับจัดการเมื่อสแกน QR Code แล้ว (ตัวอย่างโค้ดลงทะเบียนวิชาเป็น placeholder)
-  const handleBarCodeScanned = async ({ type, data }) => {
-    setScanned(true);
-    setScanning(false);
+  // ฟังก์ชันสำหรับลงทะเบียนด้วยรหัสห้อง (ใช้ได้ทั้งกรอกด้วยมือและสแกน QR Code)
+  const registerRoomCode = async (code) => {
+    if (code.trim() === "") {
+      Alert.alert("ข้อผิดพลาด", "กรุณากรอกรหัสห้อง");
+      return;
+    }
     try {
       const user = auth.currentUser;
       if (!user) return;
-      // สมมติว่า QR Code ส่งรหัสวิชา (classId) มาให้
-      await setDoc(doc(db, `users/${user.uid}/classroom`, data), {
-        cid: data,
-        status: 1, // สมมติว่าลงทะเบียนแล้ว (status=1)
-        timestamp: new Date().toISOString(),
-      });
+      let foundOwner = null;
+      // ค้นหาห้องที่มีรหัสตรงกับ code ในทุกผู้ใช้
+      const usersRef = collection(db, "users");
+      const usersSnap = await getDocs(usersRef);
+      for (const userDoc of usersSnap.docs) {
+        const ownerUid = userDoc.id;
+        const classroomRef = doc(db, `users/${ownerUid}/classroom`, code);
+        const classroomSnap = await getDoc(classroomRef);
+        if (classroomSnap.exists()) {
+          foundOwner = ownerUid;
+          break;
+        }
+      }
+      if (!foundOwner) {
+        Alert.alert("ไม่พบรหัสห้อง", "กรุณาตรวจสอบรหัสห้องอีกครั้ง");
+        return;
+      }
+      // บันทึกข้อมูลนักศึกษาลงใน subcollection "students" ของห้องที่พบ
+      await setDoc(
+        doc(db, `users/${foundOwner}/classroom/${code}/students`, user.uid),
+        {
+          uid: user.uid,
+          stid: userData?.stid || "",
+          name: userData?.name || "",
+          email: userData?.email || "",
+          phone: userData?.phone || "",
+          status: 0, // กำลังดำเนินการ
+        }
+      );
       await fetchRegisteredClasses(user.uid);
-      Alert.alert("ลงทะเบียนสำเร็จ", `ลงทะเบียนวิชา ${data} เรียบร้อยแล้ว`);
+      Alert.alert("ลงทะเบียนสำเร็จ", `ลงทะเบียนเข้าห้อง ${code} เรียบร้อยแล้ว`);
     } catch (error) {
-      console.error("Registration error:", error);
-      Alert.alert("ลงทะเบียนไม่สำเร็จ", "เกิดข้อผิดพลาดในการลงทะเบียน");
+      console.error("Register with code error:", error);
+      Alert.alert("เกิดข้อผิดพลาด", "ไม่สามารถลงทะเบียนได้");
     }
+  };
+
+  // ฟังก์ชันสำหรับลงทะเบียนด้วยรหัสห้องจาก TextInput
+  const handleRegisterWithCode = async () => {
+    await registerRoomCode(roomCode);
+    setRoomCode("");
+  };
+
+  // ฟังก์ชันสำหรับจัดการเมื่อสแกน QR Code แล้ว (ใช้รหัสที่สแกนได้เป็นรหัสห้อง)
+  const handleBarCodeScanned = async ({ type, data }) => {
+    setScanned(true);
+    setScanning(false);
+    await registerRoomCode(data);
   };
 
   const startScanning = async () => {
@@ -246,12 +287,28 @@ const HomeScreen = ({ navigation }) => {
                 สแกน QR Code เพื่อลงทะเบียนวิชาเรียน
               </Text>
             </View>
-            <TouchableOpacity
-              style={styles.scanButton}
-              onPress={startScanning}
-            >
+            <TouchableOpacity style={styles.scanButton} onPress={startScanning}>
               <MaterialIcons name="qr-code-scanner" size={24} color="white" />
               <Text style={styles.scanButtonText}>เปิดสแกนเนอร์</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Manual Registration Card */}
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <MaterialIcons name="edit" size={24} color="#3498db" />
+            <Text style={styles.cardTitle}>ลงทะเบียนด้วยรหัสห้อง</Text>
+          </View>
+          <View style={styles.cardContent}>
+            <TextInput
+              style={styles.input}
+              placeholder="กรอกรหัสห้อง"
+              value={roomCode}
+              onChangeText={setRoomCode}
+            />
+            <TouchableOpacity style={styles.registerButton} onPress={handleRegisterWithCode}>
+              <Text style={styles.registerButtonText}>ลงทะเบียน</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -314,7 +371,7 @@ const HomeScreen = ({ navigation }) => {
                   ยังไม่มีวิชาที่ลงทะเบียน
                 </Text>
                 <Text style={styles.emptyClassesSubtext}>
-                  สแกน QR Code เพื่อลงทะเบียนวิชาเรียน
+                  สแกน QR Code หรือลงทะเบียนด้วยรหัสห้อง
                 </Text>
               </View>
             )}
@@ -329,9 +386,7 @@ const HomeScreen = ({ navigation }) => {
           <CameraView
             style={styles.camera}
             onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
-            barcodeScannerSettings={{
-              barcodeTypes: ["qr"],
-            }}
+            barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
           >
             <View style={styles.scannerOverlay}>
               <View style={styles.scanFrame} />
@@ -495,6 +550,24 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     fontSize: 16,
     marginLeft: 8,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 10,
+  },
+  registerButton: {
+    backgroundColor: "#4CAF50",
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  registerButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
   },
   classItem: {
     flexDirection: "row",
