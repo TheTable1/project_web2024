@@ -44,7 +44,7 @@ function LoginApp() {
       });
   };
 
-  google_logout(){
+  google_logout()
     if(confirm("Are you sure?")){
       firebase.auth().signOut();
     }
@@ -58,7 +58,7 @@ function LoginApp() {
       </button>
     </div>
   );
-}
+
 
 // Render React Component ด้วย React 18
 const container = document.getElementById("root");
