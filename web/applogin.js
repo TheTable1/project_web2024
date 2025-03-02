@@ -35,174 +35,6 @@ function QRCodeComponent({ value, size }) {
   return <div ref={qrRef}></div>;
 }
 
-// QAModal Component สำหรับตั้งคำถามและแสดงคำตอบแบบ Realtime
-function QAModal({ show, onClose, subject, userId, currentCheckinNo }) {
-  const [questionNo, setQuestionNo] = React.useState("");
-  const [questionText, setQuestionText] = React.useState("");
-  const [answers, setAnswers] = React.useState([]);
-  const [unsubscribeAnswers, setUnsubscribeAnswers] = React.useState(null);
-
-  // เมื่อ modal ปิด ให้เคลียร์ข้อมูลและยกเลิก listener ถ้ามี
-  React.useEffect(() => {
-    if (!show) {
-      setQuestionNo("");
-      setQuestionText("");
-      setAnswers([]);
-      if (unsubscribeAnswers) {
-        unsubscribeAnswers();
-        setUnsubscribeAnswers(null);
-      }
-    }
-  }, [show]);
-
-  const startQuestion = () => {
-    if (!currentCheckinNo) {
-      alert("กรุณาเปิดเช็คชื่อก่อนที่จะตั้งคำถาม");
-      return;
-    }
-    if (!questionNo || !questionText) {
-      alert("กรุณากรอกข้อมูลให้ครบถ้วน");
-      return;
-    }
-    auth.onAuthStateChanged((user) => {
-      if (!user) {
-        alert("กรุณาเข้าสู่ระบบก่อน");
-        return;
-      }
-      const uid = user.uid;
-      db.collection("users")
-        .doc(uid)
-        .collection("classroom")
-        .doc(subject.id)
-        .collection("checkin")
-        .doc(currentCheckinNo)
-        .set(
-          {
-            question_no: questionNo,
-            question_text: questionText,
-            question_show: true,
-          },
-          { merge: true }
-        )
-        .then(() => {
-          alert("เริ่มถามคำถามสำเร็จ");
-          // เริ่มฟัง (Realtime) คำตอบจาก subcollection "answers" โดย filter ตาม question_no
-          const unsubscribe = db
-            .collection("users")
-            .doc(uid)
-            .collection("classroom")
-            .doc(subject.id)
-            .collection("checkin")
-            .doc(currentCheckinNo)
-            .collection("answers")
-            .where("question_no", "==", questionNo)
-            .onSnapshot((snapshot) => {
-              const ansList = [];
-              snapshot.forEach((doc) => {
-                ansList.push(doc.data());
-              });
-              setAnswers(ansList);
-            });
-          setUnsubscribeAnswers(() => unsubscribe);
-        })
-        .catch((error) => {
-          console.error("Error starting question:", error);
-          alert("เกิดข้อผิดพลาด: " + error.message);
-        });
-    });
-  };
-
-  const closeQuestion = () => {
-    if (!currentCheckinNo) {
-      alert("ไม่มีเช็คชื่อที่เปิดอยู่");
-      return;
-    }
-    auth.onAuthStateChanged((user) => {
-      if (!user) {
-        alert("กรุณาเข้าสู่ระบบก่อน");
-        return;
-      }
-      const uid = user.uid;
-      db.collection("users")
-        .doc(uid)
-        .collection("classroom")
-        .doc(subject.id)
-        .collection("checkin")
-        .doc(currentCheckinNo)
-        .set(
-          {
-            question_show: false,
-          },
-          { merge: true }
-        )
-        .then(() => {
-          alert("ปิดคำถามเรียบร้อย");
-          if (unsubscribeAnswers) {
-            unsubscribeAnswers();
-            setUnsubscribeAnswers(null);
-          }
-        })
-        .catch((error) => {
-          console.error("Error closing question:", error);
-          alert("เกิดข้อผิดพลาด: " + error.message);
-        });
-    });
-  };
-
-  return (
-    <Modal show={show} onHide={onClose} centered>
-      <Modal.Header closeButton>
-        <Modal.Title>ตั้งคำถามในห้องเรียน</Modal.Title>
-      </Modal.Header>
-      <Modal.Body>
-        <Form>
-          <Form.Group className="mb-3">
-            <Form.Label>หมายเลขคำถาม</Form.Label>
-            <Form.Control
-              type="number"
-              value={questionNo}
-              onChange={(e) => setQuestionNo(e.target.value)}
-              placeholder="กรอกหมายเลขคำถาม"
-            />
-          </Form.Group>
-          <Form.Group className="mb-3">
-            <Form.Label>ข้อความคำถาม</Form.Label>
-            <Form.Control
-              as="textarea"
-              rows={3}
-              value={questionText}
-              onChange={(e) => setQuestionText(e.target.value)}
-              placeholder="กรอกข้อความคำถาม"
-            />
-          </Form.Group>
-          <div className="d-flex justify-content-between">
-            <Button variant="success" onClick={startQuestion}>
-              เริ่มถาม
-            </Button>
-            <Button variant="danger" onClick={closeQuestion}>
-              ปิดคำถาม
-            </Button>
-          </div>
-          <hr />
-          <h5>คำตอบที่ได้รับ (Realtime)</h5>
-          {answers.length > 0 ? (
-            answers.map((ans, index) => (
-              <p key={index}>{ans.answer_text || "ไม่มีคำตอบ"}</p>
-            ))
-          ) : (
-            <p>ยังไม่มีคำตอบ</p>
-          )}
-        </Form>
-      </Modal.Body>
-      <Modal.Footer>
-        <Button variant="secondary" onClick={onClose}>
-          ปิด
-        </Button>
-      </Modal.Footer>
-    </Modal>
-  );
-}
-
 // Main App Component
 class App extends React.Component {
   constructor(props) {
@@ -289,6 +121,7 @@ class App extends React.Component {
     }
   };
 
+  // Handlers สำหรับฟอร์มเพิ่มวิชา
   handleSubjectChange = (e) => {
     this.setState({ newSubject: e.target.value });
   };
@@ -299,6 +132,7 @@ class App extends React.Component {
     this.setState({ newRoom: e.target.value });
   };
 
+  // เพิ่มวิชาใหม่ (ใช้ข้อมูลจากฟอร์ม Manage Subjects)
   addSubject = async () => {
     const { newSubject, newSubjectCode, newRoom, user, newPhoto } = this.state;
     if (newSubject.trim() === "" || newSubjectCode.trim() === "") {
@@ -330,6 +164,7 @@ class App extends React.Component {
           room: newRoom,
         });
       alert("Subject added successfully!");
+      // reset form (คงเป็นช่องว่าง)
       this.setState({
         newSubject: "",
         newSubjectCode: "",
@@ -342,9 +177,11 @@ class App extends React.Component {
     }
   };
 
+  // เมื่อกด Edit ในตารางวิชา จะเปิด Modal แก้ไข (โดยฟอร์มแก้ไขจะเริ่มต้นเป็นช่องว่าง)
   editSubject = (subject) => {
     this.setState({
       subjectToEdit: subject,
+      // ไม่ pre-populate ค่าในฟอร์ม Add Subject ให้คงว่างอยู่
       newPhoto: null,
       showEditSubjectModal: true,
     });
@@ -358,6 +195,7 @@ class App extends React.Component {
     });
   };
 
+  // ฟังก์ชันอัปเดตวิชา (จะได้รับข้อมูลจาก Modal แก้ไข)
   handleUpdateSubject = async (updated) => {
     const { subjectToEdit, user } = this.state;
     if (!subjectToEdit) return;
@@ -629,7 +467,7 @@ function SubjectTable({ subjects, onDelete, onEdit }) {
   );
 }
 
-// Component: ClassroomList
+// Component: ClassroomList (แสดงวิชาในรูปแบบการ์ด)
 function ClassroomList({ subjects, onSelect }) {
   return (
     <div className="mt-4">
@@ -657,7 +495,7 @@ function ClassroomList({ subjects, onSelect }) {
   );
 }
 
-// Component: SubjectDetail
+// Component: SubjectDetail (หน้ารายละเอียดวิชาพร้อมฟังก์ชันเช็คชื่อ)
 function SubjectDetail({ subject, onBack, userId }) {
   const [showQRCodeModal, setShowQRCodeModal] = React.useState(false);
   const [students, setStudents] = React.useState([]);
@@ -1530,11 +1368,8 @@ function SubjectDetail({ subject, onBack, userId }) {
             >
               แสดง QRCode วิชา
             </Button>
-            <Button variant="secondary" onClick={openQAModal} className="me-2">
+            <Button variant="secondary" onClick={openQA} className="me-2">
               ถาม-ตอบ
-            </Button>
-            <Button variant="info" onClick={openQuestionList} className="me-2">
-              ดูคำถาม
             </Button>
           </div>
           <div className="mb-2">
@@ -1568,6 +1403,7 @@ function SubjectDetail({ subject, onBack, userId }) {
         </Card.Body>
       </Card>
 
+      {/* QR Code Modal */}
       <Modal
         show={showQRCodeModal}
         onHide={() => setShowQRCodeModal(false)}
@@ -2175,93 +2011,25 @@ function SubjectDetail({ subject, onBack, userId }) {
           </Table>
         </div>
       )}
-
-      {showQAModal && (
-        <QAModal
-          show={showQAModal}
-          onClose={() => setShowQAModal(false)}
-          subject={subject}
-          userId={userId}
-          currentCheckinNo={currentCheckinNo}
-        />
-      )}
-
-      {/* Modal สำหรับแสดงรายการคำถามจากทุกการเช็คอิน */}
-      <Modal
-        show={showQuestionListModal}
-        onHide={() => setShowQuestionListModal(false)}
-        centered
-        size="lg"
-      >
-        <Modal.Header closeButton>
-          <Modal.Title>รายการคำถามทั้งหมด</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <Table striped bordered hover responsive>
-            <thead className="table-dark">
-              <tr>
-                <th>Checkin ID</th>
-                <th>หมายเลขคำถาม</th>
-                <th>ข้อความคำถาม</th>
-                <th>แสดงคำถาม</th>
-                <th>วันที่ตั้ง</th>
-                <th>Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {questionList.map((q) => (
-                <tr key={q.id}>
-                  <td>{q.id}</td>
-                  <td>{q.question_no || "-"}</td>
-                  <td>{q.question_text || "-"}</td>
-                  <td>{q.question_show ? "Yes" : "No"}</td>
-                  <td>
-                    {q.createdAt
-                      ? new Date(q.createdAt.seconds * 1000).toLocaleString()
-                      : "-"}
-                  </td>
-                  <td>
-                    <Button
-                      variant={q.question_show ? "warning" : "success"}
-                      size="sm"
-                      onClick={() => toggleQuestionStatus(q)}
-                    >
-                      {q.question_show ? "ปิดคำถาม" : "เปิดคำถาม"}
-                    </Button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </Table>
-        </Modal.Body>
-        <Modal.Footer>
-          <Button
-            variant="secondary"
-            onClick={() => setShowQuestionListModal(false)}
-          >
-            Close
-          </Button>
-        </Modal.Footer>
-      </Modal>
     </div>
   );
 }
 
-// Component: SubjectAvatarSelector
+// Component: SubjectAvatarSelector (Modal สำหรับเลือกรูปอวตารของวิชา)
 function SubjectAvatarSelector({ show, onSelect, onClose, currentAvatar }) {
   const defaultAvatars = [
-    "/project_web2024/web/default-subject.jpg",
-    "/project_web2024/web/default-subject1.jpg",
-    "/project_web2024/web/default-subject2.jpg",
-    "/project_web2024/web/default-subject3.jpg",
-    "/project_web2024/web/default-subject4.jpg",
-    "/project_web2024/web/default-subject5.jpg",
-    "/project_web2024/web/default-subject6.jpg",
-    "/project_web2024/web/default-subject7.jpg",
-    "/project_web2024/web/default-subject8.jpg",
-    "/project_web2024/web/default-subject9.jpg",
-    "/project_web2024/web/default-subject10.jpg",
-    "/project_web2024/web/default-subject11.jpg",
+    "/web/default-subject.jpg",
+    "/web/default-subject1.jpg",
+    "/web/default-subject2.jpg",
+    "/web/default-subject3.jpg",
+    "/web/default-subject4.jpg",
+    "/web/default-subject5.jpg",
+    "/web/default-subject6.jpg",
+    "/web/default-subject7.jpg",
+    "/web/default-subject8.jpg",
+    "/web/default-subject9.jpg",
+    "/web/default-subject10.jpg",
+    "/web/default-subject11.jpg",
   ];
   return (
     <Modal show={show} onHide={onClose} centered>
@@ -2302,7 +2070,7 @@ function SubjectAvatarSelector({ show, onSelect, onClose, currentAvatar }) {
   );
 }
 
-// Component: EditSubjectModal
+// Component: EditSubjectModal (Modal สำหรับแก้ไขวิชา โดยเริ่มต้นเป็นช่องว่าง)
 function EditSubjectModal({
   show,
   subject,
@@ -2317,6 +2085,7 @@ function EditSubjectModal({
   const [avatar, setAvatar] = React.useState("");
   const [showAvatarModal, setShowAvatarModal] = React.useState(false);
 
+  // Pre-populate ข้อมูลเดิมเมื่อ Modal เปิดขึ้นและ subject มีค่า
   React.useEffect(() => {
     if (subject) {
       setName(subject.name || "");
@@ -2411,7 +2180,7 @@ function EditSubjectModal({
   );
 }
 
-// Component: LoginBox
+// Component: LoginBox (แสดงข้อมูลผู้ใช้)
 function LoginBox({ user, app }) {
   const [userData, setUserData] = React.useState(null);
   const [name, setName] = React.useState("");
@@ -2508,7 +2277,7 @@ function LoginBox({ user, app }) {
   );
 }
 
-// Component: EditProfileButton
+// Component: EditProfileButton (แก้ไขข้อมูลโปรไฟล์)
 function EditProfileButton({
   userId,
   currentName,
