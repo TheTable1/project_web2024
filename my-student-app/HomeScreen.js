@@ -117,16 +117,16 @@ const HomeScreen = ({ navigation }) => {
 
   return (
     <ScrollView style={{ flex: 1, padding: 20 }}>
-      {userData && (
-        <View style={{ marginBottom: 20 }}>
-          <Text style={{ fontSize: 20, fontWeight: "bold" }}>
-            ข้อมูลผู้ใช้งาน
-          </Text>
+      <Text style={{ fontSize: 18, fontWeight: "bold" }}>ข้อมูลผู้ใช้</Text>
+      {userData ? (
+        <View style={{ padding: 10, borderBottomWidth: 1 }}>
           <Text>ชื่อ: {userData.name}</Text>
           <Text>อีเมล: {userData.email}</Text>
           <Text>เบอร์โทร: {userData.phone}</Text>
           <Text>รหัสนักศึกษา: {userData.stid}</Text>
         </View>
+      ) : (
+        <Text>กำลังโหลดข้อมูล...</Text>
       )}
 
       <Text style={{ fontSize: 18, fontWeight: "bold" }}>วิชาที่ลงทะเบียน</Text>
