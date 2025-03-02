@@ -1,8 +1,23 @@
-import React, { useState, useEffect } from "react";
-import { View, Text, TextInput, Button, Alert, StyleSheet, TouchableOpacity, Image, SafeAreaView, KeyboardAvoidingView, Platform } from "react-native";
+import React, { useState, useRef } from "react";
+import {
+  View,
+  Text,
+  TextInput,
+  Alert,
+  StyleSheet,
+  TouchableOpacity,
+  SafeAreaView,
+  KeyboardAvoidingView,
+  Platform,
+  ActivityIndicator,
+} from "react-native";
 import { auth, db } from "./firebase";
 import { signInWithEmailAndPassword, PhoneAuthProvider, signInWithCredential } from "firebase/auth";
 import { MaterialIcons } from '@expo/vector-icons';
+import { FirebaseRecaptchaVerifierModal } from "expo-firebase-recaptcha";
+import firebase from "firebase/compat/app";
+
+// ต้องติดตั้ง: npm install expo-firebase-recaptcha firebase@9.6.11
 
 const LoginScreen = ({ navigation }) => {
   const [email, setEmail] = useState("");
@@ -12,6 +27,20 @@ const LoginScreen = ({ navigation }) => {
   const [otpCode, setOtpCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [showOtp, setShowOtp] = useState(false);
+  const [showPhoneLogin, setShowPhoneLogin] = useState(false);
+  
+  const recaptchaVerifier = useRef(null);
+  
+  // คัดลอก firebaseConfig จาก firebase.js ของคุณ
+  const firebaseConfig = {
+    apiKey: "AIzaSyDrjydWmT19vEJu6zvsJCZk-iLg5P9G_9c",
+    authDomain: "web2567teungteung.firebaseapp.com",
+    projectId: "web2567teungteung",
+    storageBucket: "web2567teungteung.firebasestorage.app",
+    messagingSenderId: "472898800755",
+    appId: "1:472898800755:web:b861572160a6ca34a4ae06",
+    measurementId: "G-LVKQEQ5Z67",
+  };
 
   // ✅ ฟังก์ชันเข้าสู่ระบบด้วย Email/Password
   const handleLogin = async () => {
@@ -38,22 +67,38 @@ const LoginScreen = ({ navigation }) => {
       return;
     }
 
+    // ตรวจสอบว่ารูปแบบหมายเลขโทรศัพท์ถูกต้อง
+    let formattedPhoneNumber = phoneNumber;
+    
+    // ถ้าไม่ได้ขึ้นต้นด้วย + ให้เพิ่ม +66
+    if (!phoneNumber.startsWith('+')) {
+      // ถ้าขึ้นต้นด้วย 0 ให้ตัดออกและเพิ่ม +66
+      if (phoneNumber.startsWith('0')) {
+        formattedPhoneNumber = '+66' + phoneNumber.substring(1);
+      } else {
+        formattedPhoneNumber = '+66' + phoneNumber;
+      }
+    }
+
     setLoading(true);
     try {
-      // สำหรับ React Native ต้องใช้ Firebase Authentication Phone หรือใช้ Firebase Auth Emulator สำหรับการทดสอบ
-      // ในกรณีนี้ เราจะจำลองการส่ง OTP สำหรับการทดสอบ
+      const phoneProvider = new PhoneAuthProvider(auth);
+      const verificationId = await phoneProvider.verifyPhoneNumber(
+        formattedPhoneNumber, 
+        recaptchaVerifier.current
+      );
       
-      // สร้างรหัส OTP จำลอง (ในการใช้งานจริงจะถูกส่งโดย Firebase)
-      setTimeout(() => {
-        setVerificationId("verification-id-placeholder");
-        setShowOtp(true);
-        setLoading(false);
-        Alert.alert("ส่ง OTP สำเร็จ", "รหัส OTP ถูกส่งไปยังหมายเลข " + phoneNumber);
-      }, 1500);
-      
+      setVerificationId(verificationId);
+      setShowOtp(true);
+      setLoading(false);
+      Alert.alert("ส่ง OTP สำเร็จ", `รหัส OTP ถูกส่งไปยังหมายเลข ${formattedPhoneNumber} แล้ว`);
     } catch (error) {
       setLoading(false);
-      Alert.alert("ส่ง OTP ไม่สำเร็จ", "ไม่สามารถส่ง OTP ได้ โปรดลองอีกครั้ง");
+      console.error("OTP Error:", error);
+      Alert.alert(
+        "ส่ง OTP ไม่สำเร็จ", 
+        "ไม่สามารถส่ง OTP ได้: " + error.message
+      );
     }
   };
 
@@ -66,30 +111,25 @@ const LoginScreen = ({ navigation }) => {
 
     setLoading(true);
     try {
-      // สำหรับการทดสอบเท่านั้น
-      if (otpCode === "123456") {
-        setLoading(false);
-        Alert.alert("เข้าสู่ระบบสำเร็จ", "ยินดีต้อนรับกลับมา!");
-        navigation.navigate("Home");
-      } else {
-        setLoading(false);
-        Alert.alert("รหัส OTP ไม่ถูกต้อง", "กรุณาตรวจสอบรหัส OTP และลองอีกครั้ง");
-      }
-      
-      /* สำหรับการใช้งานจริงกับ Firebase
       const credential = PhoneAuthProvider.credential(verificationId, otpCode);
       await signInWithCredential(auth, credential);
       setLoading(false);
       navigation.navigate("Home");
-      */
     } catch (error) {
       setLoading(false);
-      Alert.alert("ยืนยัน OTP ไม่สำเร็จ", "รหัส OTP ไม่ถูกต้อง");
+      console.error("Verify OTP Error:", error);
+      Alert.alert("ยืนยัน OTP ไม่สำเร็จ", "รหัส OTP ไม่ถูกต้องหรือหมดอายุแล้ว");
     }
   };
 
   return (
     <SafeAreaView style={styles.container}>
+      <FirebaseRecaptchaVerifierModal
+        ref={recaptchaVerifier}
+        firebaseConfig={firebaseConfig}
+        attemptInvisibleVerification={true}
+      />
+      
       <KeyboardAvoidingView 
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={styles.keyboardView}
@@ -103,26 +143,26 @@ const LoginScreen = ({ navigation }) => {
           <>
             <View style={styles.tabContainer}>
               <TouchableOpacity 
-                style={[styles.tab, email ? styles.activeTab : null]} 
-                onPress={() => setEmail(email || "test@example.com")}
+                style={[styles.tab, !showPhoneLogin ? styles.activeTab : null]} 
+                onPress={() => setShowPhoneLogin(false)}
               >
-                <Text style={styles.tabText}>Email</Text>
+                <Text style={!showPhoneLogin ? styles.activeTabText : styles.tabText}>Email</Text>
               </TouchableOpacity>
               <TouchableOpacity 
-                style={[styles.tab, phoneNumber ? styles.activeTab : null]}
-                onPress={() => setPhoneNumber(phoneNumber || "0812345678")}
+                style={[styles.tab, showPhoneLogin ? styles.activeTab : null]}
+                onPress={() => setShowPhoneLogin(true)}
               >
-                <Text style={styles.tabText}>โทรศัพท์</Text>
+                <Text style={showPhoneLogin ? styles.activeTabText : styles.tabText}>โทรศัพท์</Text>
               </TouchableOpacity>
             </View>
 
-            {phoneNumber ? (
+            {showPhoneLogin ? (
               <View style={styles.formContainer}>
                 <View style={styles.inputContainer}>
                   <MaterialIcons name="phone" size={24} color="#666" />
                   <TextInput
                     style={styles.input}
-                    placeholder="หมายเลขโทรศัพท์"
+                    placeholder="หมายเลขโทรศัพท์ (เช่น 0812345678)"
                     value={phoneNumber}
                     onChangeText={setPhoneNumber}
                     keyboardType="phone-pad"
@@ -134,7 +174,7 @@ const LoginScreen = ({ navigation }) => {
                   disabled={loading}
                 >
                   <Text style={styles.buttonText}>
-                    {loading ? "กำลังดำเนินการ..." : "ส่ง OTP"}
+                    {loading ? "กำลังส่ง OTP..." : "ส่ง OTP"}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -167,7 +207,7 @@ const LoginScreen = ({ navigation }) => {
                   disabled={loading}
                 >
                   <Text style={styles.buttonText}>
-                    {loading ? "กำลังดำเนินการ..." : "เข้าสู่ระบบ"}
+                    {loading ? "กำลังเข้าสู่ระบบ..." : "เข้าสู่ระบบ"}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -190,7 +230,7 @@ const LoginScreen = ({ navigation }) => {
               <MaterialIcons name="sms" size={24} color="#666" />
               <TextInput
                 style={styles.input}
-                placeholder="รหัส OTP"
+                placeholder="รหัส OTP (6 หลัก)"
                 value={otpCode}
                 onChangeText={setOtpCode}
                 keyboardType="numeric"
@@ -268,6 +308,10 @@ const styles = StyleSheet.create({
   tabText: {
     fontWeight: "600",
     color: "#333",
+  },
+  activeTabText: {
+    fontWeight: "600",
+    color: "#FFFFFF",
   },
   formContainer: {
     backgroundColor: "#FFFFFF",
