@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -19,9 +19,8 @@ import {
   doc,
   collection,
   getDocs,
-  updateDoc,
-  arrayUnion,
   onAuthStateChanged,
+  setDoc,
 } from "./firebase";
 import { MaterialIcons } from "@expo/vector-icons";
 import { CameraView, useCameraPermissions } from "expo-camera";
@@ -31,16 +30,20 @@ const { width, height } = Dimensions.get("window");
 const HomeScreen = ({ navigation }) => {
   const [userData, setUserData] = useState(null);
   const [loading, setLoading] = useState(true);
+  // รายวิชาที่นักศึกษาลงทะเบียน
   const [registeredClasses, setRegisteredClasses] = useState([]);
+  // ชื่อวิชาที่ดึงมาจากทุกผู้ใช้/ทุก classroom โดย key เป็นรหัสวิชา
+  const [classNames, setClassNames] = useState({});
   const [scanning, setScanning] = useState(false);
   const [scanned, setScanned] = useState(false);
   const [permission, requestPermission] = useCameraPermissions();
 
-  // Check if user is logged in
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
         await fetchUserData(user.uid);
+        await fetchRegisteredClasses(user.uid);
+        await fetchClassNames();
       } else {
         navigation.replace("Login");
       }
@@ -48,20 +51,15 @@ const HomeScreen = ({ navigation }) => {
     return unsubscribe;
   }, []);
 
-  // Fetch user data from Firestore
+  // ดึงข้อมูลผู้ใช้จาก collection "Student" หรือ "users"
   const fetchUserData = async (uid) => {
     try {
-      // Try to fetch from "Student" collection first (friend's branch)
       let userDoc = await getDoc(doc(db, "Student", uid));
-      
-      // If not found, try "users" collection (from your original code)
       if (!userDoc.exists()) {
         userDoc = await getDoc(doc(db, "users", uid));
       }
-      
       if (userDoc.exists()) {
         setUserData(userDoc.data());
-        fetchUserClasses(uid);
       } else {
         Alert.alert("ข้อผิดพลาด", "ไม่พบข้อมูลผู้ใช้");
       }
@@ -72,120 +70,91 @@ const HomeScreen = ({ navigation }) => {
     setLoading(false);
   };
 
-  // Fetch user's registered classes
-  const fetchUserClasses = async (uid) => {
+  // ฟังก์ชันนี้จะวนลูปในทุกผู้ใช้และทุก classroom เพื่อตรวจสอบว่ามี document ใน subcollection "students"
+  // ที่มี id ตรงกับผู้ใช้ที่ล็อกอินหรือไม่ (ดึง status จาก document นั้น)
+  const fetchRegisteredClasses = async (uid) => {
+    const registered = [];
     try {
-      // Try to fetch from the structure used in your current app
-      let classRef = collection(db, `users/${uid}/classroom`);
-      let classSnap = await getDocs(classRef);
-      
-      if (!classSnap.empty) {
-        const classList = classSnap.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }));
-        setRegisteredClasses(classList);
-      } else {
-        // Try alternative structure from the other branch
-        const userDoc = await getDoc(doc(db, "Student", uid));
-        if (userDoc.exists() && userDoc.data().enrolledClasses) {
-          const classes = userDoc.data().enrolledClasses || [];
-          const classList = classes.map(classId => ({
-            id: classId,
-            status: 2
-          }));
-          setRegisteredClasses(classList);
+      const usersRef = collection(db, "users");
+      const usersSnap = await getDocs(usersRef);
+      for (const userDoc of usersSnap.docs) {
+        const ownerUid = userDoc.id;
+        const classroomsRef = collection(db, `users/${ownerUid}/classroom`);
+        const classSnap = await getDocs(classroomsRef);
+        for (const classDoc of classSnap.docs) {
+          const classId = classDoc.id;
+          const studentDocRef = doc(
+            db,
+            `users/${ownerUid}/classroom/${classId}/students`,
+            uid
+          );
+          const studentSnap = await getDoc(studentDocRef);
+          if (studentSnap.exists()) {
+            const studentData = studentSnap.data();
+            registered.push({
+              ownerUid,
+              id: classId,
+              status: studentData.status, // 0 หรือ 1
+              timestamp: classDoc.data().timestamp || null,
+            });
+          }
         }
       }
     } catch (error) {
-      console.error("Error fetching classes:", error);
+      console.error("Error fetching registered classes:", error);
     }
+    setRegisteredClasses(registered);
   };
 
-  // Handle QR code scanning
+  // ดึงชื่อวิชาจาก path /users/{ownerUid}/classroom/{classId}/info/details
+  const fetchClassNames = async () => {
+    const names = {};
+    try {
+      const usersRef = collection(db, "users");
+      const usersSnap = await getDocs(usersRef);
+      for (const userDoc of usersSnap.docs) {
+        const ownerUid = userDoc.id;
+        const classroomsRef = collection(db, `users/${ownerUid}/classroom`);
+        const classSnap = await getDocs(classroomsRef);
+        for (const classDoc of classSnap.docs) {
+          const classId = classDoc.id;
+          const detailsRef = doc(
+            db,
+            `users/${ownerUid}/classroom/${classId}/info/details`
+          );
+          const detailsSnap = await getDoc(detailsRef);
+          if (detailsSnap.exists()) {
+            names[classId] = detailsSnap.data().name;
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching class names:", error);
+    }
+    setClassNames(names);
+  };
+
+  // ฟังก์ชันสำหรับจัดการเมื่อสแกน QR Code แล้ว (ตัวอย่างโค้ดลงทะเบียนวิชาเป็น placeholder)
   const handleBarCodeScanned = async ({ type, data }) => {
     setScanned(true);
     setScanning(false);
-    
     try {
       const user = auth.currentUser;
       if (!user) return;
-
-      // Check both database structures
-      let userRef;
-      let isStudent = false;
-      
-      // Check if user exists in "users" collection
-      const userDocRef = doc(db, "users", user.uid);
-      const userDocSnap = await getDoc(userDocRef);
-      
-      if (userDocSnap.exists()) {
-        userRef = userDocRef;
-      } else {
-        // Check if user exists in "Student" collection
-        const studentDocRef = doc(db, "Student", user.uid);
-        const studentDocSnap = await getDoc(studentDocRef);
-        
-        if (studentDocSnap.exists()) {
-          userRef = studentDocRef;
-          isStudent = true;
-        } else {
-          Alert.alert("ข้อผิดพลาด", "ไม่พบข้อมูลผู้ใช้");
-          return;
-        }
-      }
-      
-      // Check if the QR code is valid (a class exists)
-      let classExists = false;
-      let className = "";
-      
-      // Try to find class in both possible structures
-      try {
-        const classDoc = await getDoc(doc(db, "Classes", data));
-        if (classDoc.exists()) {
-          classExists = true;
-          className = classDoc.data().name || "วิชาที่สแกน";
-        } else {
-          const classDoc = await getDoc(doc(db, "classrooms", data));
-          if (classDoc.exists()) {
-            classExists = true;
-            className = classDoc.data().name || "วิชาที่สแกน";
-          }
-        }
-      } catch (error) {
-        console.error("Error checking class:", error);
-      }
-      
-      if (!classExists) {
-        Alert.alert("ไม่พบวิชา", "QR Code ไม่ถูกต้องหรือไม่พบวิชานี้ในระบบ");
-        return;
-      }
-      
-      // Register for class based on which structure we're using
-      if (isStudent) {
-        await updateDoc(userRef, {
-          enrolledClasses: arrayUnion(data),
-        });
-      } else {
-        // Add to user's classroom subcollection
-        await setDoc(doc(db, `users/${user.uid}/classroom`, data), {
-          cid: data,
-          status: 2,
-          timestamp: new Date().toISOString(),
-        });
-      }
-      
-      // Refresh the class list
-      await fetchUserClasses(user.uid);
-      
-      Alert.alert("ลงทะเบียนสำเร็จ", `ลงทะเบียนวิชา ${className} เรียบร้อยแล้ว`);
+      // สมมติว่า QR Code ส่งรหัสวิชา (classId) มาให้
+      await setDoc(doc(db, `users/${user.uid}/classroom`, data), {
+        cid: data,
+        status: 1, // สมมติว่าลงทะเบียนแล้ว (status=1)
+        timestamp: new Date().toISOString(),
+      });
+      await fetchRegisteredClasses(user.uid);
+      Alert.alert("ลงทะเบียนสำเร็จ", `ลงทะเบียนวิชา ${data} เรียบร้อยแล้ว`);
     } catch (error) {
       console.error("Registration error:", error);
       Alert.alert("ลงทะเบียนไม่สำเร็จ", "เกิดข้อผิดพลาดในการลงทะเบียน");
     }
   };
 
-  // Start QR code scanning
   const startScanning = async () => {
     const { granted } = await requestPermission();
     if (granted) {
@@ -199,7 +168,6 @@ const HomeScreen = ({ navigation }) => {
     }
   };
 
-  // Log out
   const handleLogout = async () => {
     try {
       await signOut(auth);
@@ -221,7 +189,6 @@ const HomeScreen = ({ navigation }) => {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#f5f5f5" />
-      
       {/* Header */}
       <View style={styles.header}>
         <View>
@@ -246,7 +213,9 @@ const HomeScreen = ({ navigation }) => {
             <View style={styles.profileSection}>
               <View style={styles.avatarContainer}>
                 <Text style={styles.avatarText}>
-                  {(userData?.name?.charAt(0) || userData?.username?.charAt(0) || "?").toUpperCase()}
+                  {(userData?.name?.charAt(0) ||
+                    userData?.username?.charAt(0) ||
+                    "?").toUpperCase()}
                 </Text>
               </View>
               <View style={styles.profileInfo}>
@@ -296,30 +265,47 @@ const HomeScreen = ({ navigation }) => {
           <View style={styles.cardContent}>
             {registeredClasses.length > 0 ? (
               registeredClasses.map((classItem) => (
-                <View key={classItem.id} style={styles.classItem}>
+                <TouchableOpacity
+                  key={classItem.id}
+                  style={styles.classItem}
+                  onPress={() =>
+                    navigation.navigate("DetailScreen", { classId: classItem.id })
+                  }
+                >
                   <View style={styles.classIconContainer}>
                     <MaterialIcons name="school" size={24} color="#3498db" />
                   </View>
                   <View style={styles.classInfo}>
-                    <Text style={styles.classId}>รหัสวิชา: {classItem.id}</Text>
+                    <Text style={styles.classId}>
+                      ชื่อวิชา:{" "}
+                      {classNames[classItem.id]
+                        ? classNames[classItem.id]
+                        : classItem.id}
+                    </Text>
                     <Text style={styles.classStatus}>
                       สถานะ:{" "}
                       <Text
                         style={[
                           styles.statusText,
-                          { color: classItem.status === 2 ? "#4CAF50" : "#FF9800" },
+                          {
+                            color:
+                              classItem.status === 1 ? "#4CAF50" : "#FF9800",
+                          },
                         ]}
                       >
-                        {classItem.status === 2 ? "ลงทะเบียนแล้ว" : "รอดำเนินการ"}
+                        {classItem.status === 1
+                          ? "ลงทะเบียนแล้ว"
+                          : "กำลังดำเนินการ"}
                       </Text>
                     </Text>
                     {classItem.timestamp && (
                       <Text style={styles.timestamp}>
-                        เวลา: {new Date(classItem.timestamp).toLocaleString()}
+                        เวลา:{" "}
+                        {new Date(classItem.timestamp).toLocaleString()}
                       </Text>
                     )}
                   </View>
-                </View>
+                </TouchableOpacity>
               ))
             ) : (
               <View style={styles.emptyClassesContainer}>
@@ -336,7 +322,7 @@ const HomeScreen = ({ navigation }) => {
         </View>
       </ScrollView>
 
-      {/* Camera Modal for QR Scanning */}
+      {/* Camera Modal สำหรับ QR Scanning */}
       {scanning && permission?.granted && (
         <View style={styles.cameraContainer}>
           <StatusBar barStyle="light-content" backgroundColor="#000000" />
@@ -353,7 +339,6 @@ const HomeScreen = ({ navigation }) => {
                 วางคิวอาร์โค้ดให้อยู่ภายในกรอบเพื่อสแกน
               </Text>
             </View>
-            
             <SafeAreaView style={styles.scannerHeader}>
               <View style={styles.scannerHeaderContent}>
                 <Text style={styles.scannerTitle}>สแกน QR Code</Text>
@@ -365,7 +350,6 @@ const HomeScreen = ({ navigation }) => {
                 </TouchableOpacity>
               </View>
             </SafeAreaView>
-            
             <View style={styles.scannerFooter}>
               <TouchableOpacity
                 style={styles.cancelScanButton}
