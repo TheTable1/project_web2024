@@ -23,7 +23,6 @@ import {
 import { db, auth } from "./firebase";
 import { MaterialIcons } from "@expo/vector-icons";
 
-// ฟังก์ชันสำหรับดึงรูปภาพในเครื่อง (หากเก็บรูปเป็น /web/... )
 const getLocalImage = (path) => {
   switch (path) {
     case "/web/default-subject.jpg":
@@ -58,60 +57,50 @@ const getLocalImage = (path) => {
 const DetailScreen = ({ route, navigation }) => {
   const { classId } = route.params;
 
-  // ข้อมูลหลักของวิชา
+  // ข้อมูลหลักของวิชาและผู้สอน
   const [classDetails, setClassDetails] = useState(null);
   const [ownerName, setOwnerName] = useState(null);
   const [ownerUid, setOwnerUid] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // ข้อมูล checkin (status=1)
+  // ข้อมูล checkin (status = 1) และสถานะเช็คชื่อ
   const [checkinList, setCheckinList] = useState([]);
+  const [checkedInMap, setCheckedInMap] = useState({});
 
-  // คำถามใน checkin
+  // คำถามและคำตอบ
   const [questionList, setQuestionList] = useState([]);
-
-  // เก็บคำตอบที่ดึงมาจาก Firestore (key = questionId)
+  // state นี้เก็บคำตอบจาก Firestore โดยอ่านจาก field "text"
   const [questionAnswers, setQuestionAnswers] = useState({});
-  // เก็บข้อความที่ผู้ใช้พิมพ์ก่อนกดส่ง (key = questionId)
+  // state สำหรับเก็บข้อความที่ผู้ใช้พิมพ์ (ก่อนส่ง)
   const [answers, setAnswers] = useState({});
 
-  // รหัสนักศึกษา (stid)
+  // รหัสนักศึกษา (stid) ที่ได้จากเอกสารใน /users
   const [studentId, setStudentId] = useState("");
 
-  // Modal เช็คอิน
+  // สำหรับ Modal เช็คอิน
   const [showCheckInModal, setShowCheckInModal] = useState(false);
   const [modalStep, setModalStep] = useState("code");
   const [checkinCodeInput, setCheckinCodeInput] = useState("");
   const [remarkText, setRemarkText] = useState("");
   const [selectedCheckin, setSelectedCheckin] = useState(null);
 
-  // ------------------- useEffect หลัก -------------------
-  // 1) ดึงข้อมูล classDetails + ownerUid ทันทีที่ classId เปลี่ยน
+  // ดึงข้อมูลเมื่อ classId เปลี่ยน
   useEffect(() => {
     fetchClassDetailsUpdated();
   }, [classId]);
 
-  // 2) เมื่อหน้า focus -> re-fetch checkin + questionList + answers
+  // เมื่อหน้า DetailScreen ถูก focus ให้ re‑fetch checkin, คำถาม และคำตอบ
   useEffect(() => {
     const unsubscribe = navigation.addListener("focus", async () => {
       if (ownerUid && studentId) {
-        // ดึง checkin+question (อัปเดต questionList)
         await fetchCheckinModified(ownerUid);
-        // ดึงคำตอบ
-        await fetchAnsweredQuestions();
+        await fetchQuestionsAndAnswers(ownerUid);
       }
     });
     return unsubscribe;
   }, [navigation, ownerUid, studentId]);
 
-  // 3) เมื่อ questionList เปลี่ยน -> ดึงคำตอบจาก Firestore ใหม่
-  useEffect(() => {
-    if (ownerUid && studentId && questionList.length > 0) {
-      fetchAnsweredQuestions();
-    }
-  }, [ownerUid, studentId, questionList]);
-
-  // 4) ดึง stid ของผู้ใช้ปัจจุบัน
+  // ดึง stid ของนักศึกษาที่ล็อกอิน (จาก /users) 
   useEffect(() => {
     const fetchStudentId = async () => {
       const user = auth.currentUser;
@@ -121,27 +110,23 @@ const DetailScreen = ({ route, navigation }) => {
         userDoc = await getDoc(doc(db, "users", user.uid));
       }
       if (userDoc.exists()) {
-        setStudentId(userDoc.data().stid);
+        // studentId นี้จะถูกใช้ในเส้นทางคำตอบ
+        setStudentId(userDoc.data().stid || user.uid);
       }
     };
     fetchStudentId();
   }, []);
 
-  // ------------------- ฟังก์ชันหลัก -------------------
-  // ดึงข้อมูลห้อง + ownerUid
+  // ดึงข้อมูลรายละเอียดวิชาและ ownerUid
   const fetchClassDetailsUpdated = async () => {
     try {
       setLoading(true);
       const usersRef = collection(db, "users");
       const usersSnap = await getDocs(usersRef);
-
       let foundDetails = null;
       let foundOwnerUid = null;
       for (const userDoc of usersSnap.docs) {
-        const detailsRef = doc(
-          db,
-          `users/${userDoc.id}/classroom/${classId}/info/details`
-        );
+        const detailsRef = doc(db, `users/${userDoc.id}/classroom/${classId}/info/details`);
         const detailsSnap = await getDoc(detailsRef);
         if (detailsSnap.exists()) {
           foundDetails = detailsSnap.data();
@@ -150,17 +135,14 @@ const DetailScreen = ({ route, navigation }) => {
         }
       }
       setClassDetails(foundDetails);
-
       if (foundOwnerUid) {
         setOwnerUid(foundOwnerUid);
-        // ดึงชื่อเจ้าของ
         const ownerRef = doc(db, "users", foundOwnerUid);
         const ownerSnap = await getDoc(ownerRef);
         if (ownerSnap.exists()) {
           setOwnerName(ownerSnap.data().name);
         }
-        // ดึง checkin
-        await fetchCheckinModified(foundOwnerUid);
+        await fetchQuestionsAndAnswers(foundOwnerUid);
       }
     } catch (error) {
       console.error("Error fetching class details:", error);
@@ -170,78 +152,75 @@ const DetailScreen = ({ route, navigation }) => {
     }
   };
 
-  // ดึง checkin (status=1)
-  const fetchCheckinModified = async (ownerUid) => {
+  // รวมการดึงข้อมูล checkin, คำถาม และคำตอบ
+  const fetchQuestionsAndAnswers = async (ownerParam) => {
+    const owner = ownerParam || ownerUid;
+    if (!owner) return;
     try {
-      const checkinRef = collection(
-        db,
-        `users/${ownerUid}/classroom/${classId}/checkin`
-      );
+      // ดึง checkin ที่มี status = 1
+      const checkinRef = collection(db, `users/${owner}/classroom/${classId}/checkin`);
       const checkinSnap = await getDocs(checkinRef);
       const activeCheckins = [];
-      checkinSnap.forEach((docSnap) => {
+      const newCheckedInMap = {};
+      const currentUser = auth.currentUser;
+      for (const docSnap of checkinSnap.docs) {
         const data = docSnap.data();
         if (data.status === 1) {
           activeCheckins.push({ id: docSnap.id, ...data });
+          if (currentUser) {
+            const checkinDocRef = doc(
+              db,
+              `users/${owner}/classroom/${classId}/checkin/${docSnap.id}/students/${currentUser.uid}`
+            );
+            const checkinDocSnap = await getDoc(checkinDocRef);
+            newCheckedInMap[docSnap.id] = checkinDocSnap.exists();
+          }
         }
-      });
+      }
       setCheckinList(activeCheckins);
+      setCheckedInMap(newCheckedInMap);
 
-      // ดึงคำถาม
-      await fetchQuestionsForCheckins(ownerUid, activeCheckins);
-    } catch (error) {
-      console.error("Error fetching checkin data:", error);
-    }
-  };
-
-  // ดึง question_show = true
-  const fetchQuestionsForCheckins = async (ownerUid, checkins) => {
-    try {
+      // ดึงคำถามจาก checkin ที่มี question_show === true
       const questionsArr = [];
-      for (const checkin of checkins) {
-        const questionRef = collection(
-          db,
-          `users/${ownerUid}/classroom/${classId}/checkin/${checkin.id}/question`
-        );
+      for (const checkin of activeCheckins) {
+        const questionRef = collection(db, `users/${owner}/classroom/${classId}/checkin/${checkin.id}/question`);
         const questionSnap = await getDocs(questionRef);
         questionSnap.forEach((qDoc) => {
           const qData = qDoc.data();
           if (qData.question_show === true) {
-            // checkinId = "1", questionId = "1" (ตัวอย่าง)
+            // ใช้ field answerId จากเอกสารคำถาม ถ้ามี ถ้าไม่มีก็ใช้ questionId
             questionsArr.push({
               checkinId: checkin.id,
               questionId: qDoc.id,
+              answerId: qData.answerId || qDoc.id,
               ...qData,
             });
           }
         });
       }
       setQuestionList(questionsArr);
-    } catch (error) {
-      console.error("Error fetching questions:", error);
-    }
-  };
 
-  // ดึงคำตอบจาก Firestore -> questionAnswers
-  const fetchAnsweredQuestions = async () => {
-    if (!ownerUid || !studentId) return;
-    const newAnswers = {};
-    for (const question of questionList) {
-      // path: checkin/<checkinId>/answers/<questionId>/students/<studentId>
-      const answerRef = doc(
-        db,
-        `users/${ownerUid}/classroom/${classId}/checkin/${question.checkinId}/answers/${question.questionId}/students/${studentId}`
-      );
-      const answerSnap = await getDoc(answerRef);
-      if (answerSnap.exists()) {
-        // อ่าน field "text"
-        newAnswers[question.questionId] = answerSnap.data().text || "";
+      // ดึงคำตอบสำหรับทุกคำถาม (อ่านจาก field "text")
+      const newAnswers = {};
+      // ใช้ studentId ที่ได้จาก Firestore (หรือ fallback เป็น auth.currentUser.uid)
+      const effectiveStudentId = studentId;
+      for (const question of questionsArr) {
+        const answerRef = doc(
+          db,
+          `users/${owner}/classroom/${classId}/checkin/${question.checkinId}/answers/${question.answerId}/students/${effectiveStudentId}`
+        );
+        const answerSnap = await getDoc(answerRef);
+        if (answerSnap.exists()) {
+          newAnswers[question.questionId] = answerSnap.data().text || "";
+        }
       }
+      setQuestionAnswers(newAnswers);
+    } catch (error) {
+      console.error("Error fetching questions and answers:", error);
     }
-    setQuestionAnswers(newAnswers);
   };
 
-  // ------------------- เช็คอิน -------------------
+  // ------------------- ฟังก์ชันเช็คอิน -------------------
   const handleCheckInPress = (item) => {
     setSelectedCheckin(item);
     setShowCheckInModal(true);
@@ -293,12 +272,11 @@ const DetailScreen = ({ route, navigation }) => {
     }
   };
 
-  // ------------------- ส่งคำตอบ -------------------
+  // ------------------- ฟังก์ชันส่งคำตอบ -------------------
   const handleSubmitAnswer = async (question) => {
     try {
       const user = auth.currentUser;
       if (!user) return;
-      // ดึง stid
       const userDocRef = doc(db, "users", user.uid);
       const userDocSnap = await getDoc(userDocRef);
       const stuId = userDocSnap.exists() ? userDocSnap.data().stid : "";
@@ -306,10 +284,12 @@ const DetailScreen = ({ route, navigation }) => {
         Alert.alert("ไม่พบรหัสนักศึกษา", "กรุณาติดต่อเจ้าหน้าที่");
         return;
       }
-      // path: checkin/<checkinId>/answers/<questionId>/students/<stuId>
+      // ใช้ field answerId จากคำถาม (หรือ fallback เป็น questionId)
+      const ansId = question.answerId || question.questionId;
+      const effectiveStudentId = studentId; // ค่านี้จะได้จาก /users/{user.uid}/stid
       const answerRef = doc(
         db,
-        `users/${ownerUid}/classroom/${classId}/checkin/${question.checkinId}/answers/${question.questionId}/students/${stuId}`
+        `users/${ownerUid}/classroom/${classId}/checkin/${question.checkinId}/answers/${ansId}/students/${effectiveStudentId}`
       );
       const answerText = answers[question.questionId]
         ? answers[question.questionId].trim()
@@ -323,13 +303,10 @@ const DetailScreen = ({ route, navigation }) => {
         { merge: true }
       );
       Alert.alert("ส่งคำตอบสำเร็จ", "คำตอบของคุณถูกบันทึกเรียบร้อย");
-
-      // อัปเดต state ให้ขึ้น "ตอบแล้ว"
       setQuestionAnswers((prev) => ({
         ...prev,
         [question.questionId]: answerText,
       }));
-      // ล้างช่อง input
       setAnswers((prev) => ({ ...prev, [question.questionId]: "" }));
     } catch (error) {
       console.error("Error submitting answer:", error);
@@ -355,7 +332,6 @@ const DetailScreen = ({ route, navigation }) => {
     );
   }
 
-  // แมป path รูป (ถ้าเป็น /web/...)
   let imageSource = null;
   if (classDetails.photo) {
     if (classDetails.photo.startsWith("/web")) {
@@ -394,11 +370,7 @@ const DetailScreen = ({ route, navigation }) => {
               </View>
             )}
             {imageSource ? (
-              <Image
-                source={imageSource}
-                style={styles.subjectImage}
-                resizeMode="contain"
-              />
+              <Image source={imageSource} style={styles.subjectImage} resizeMode="contain" />
             ) : (
               <Text style={styles.noImageText}>ไม่มีรูปภาพ</Text>
             )}
@@ -416,13 +388,17 @@ const DetailScreen = ({ route, navigation }) => {
               <Text style={{ marginBottom: 8, color: "#555" }}>
                 {item.description || "ยังไม่มีรายละเอียดสำหรับการเช็คอินนี้"}
               </Text>
-              <TouchableOpacity
-                style={styles.checkinButton}
-                onPress={() => handleCheckInPress(item)}
-              >
-                <MaterialIcons name="check-circle" size={20} color="#fff" />
-                <Text style={styles.checkinButtonText}>เช็คชื่อ</Text>
-              </TouchableOpacity>
+              {checkedInMap[item.id] ? (
+                <View style={styles.checkedInContainer}>
+                  <MaterialIcons name="check-circle" size={20} color="#4CAF50" style={{ marginRight: 4 }} />
+                  <Text style={styles.checkedInText}>เช็คแล้ว</Text>
+                </View>
+              ) : (
+                <TouchableOpacity style={styles.checkinButton} onPress={() => handleCheckInPress(item)}>
+                  <MaterialIcons name="check-circle" size={20} color="#fff" />
+                  <Text style={styles.checkinButtonText}>เช็คชื่อ</Text>
+                </TouchableOpacity>
+              )}
             </View>
           </View>
         ))}
@@ -444,15 +420,8 @@ const DetailScreen = ({ route, navigation }) => {
                     </Text>
                     {existingAnswer ? (
                       <View style={styles.answeredContainer}>
-                        <MaterialIcons
-                          name="check-circle"
-                          size={20}
-                          color="#3498db"
-                          style={{ marginRight: 4 }}
-                        />
-                        <Text style={styles.answeredText}>
-                          ตอบแล้ว: {existingAnswer}
-                        </Text>
+                        <MaterialIcons name="check-circle" size={20} color="#3498db" style={{ marginRight: 4 }} />
+                        <Text style={styles.answeredText}>ตอบแล้ว: {existingAnswer}</Text>
                       </View>
                     ) : (
                       <>
@@ -461,16 +430,10 @@ const DetailScreen = ({ route, navigation }) => {
                           placeholder="กรอกคำตอบ..."
                           value={answers[question.questionId] || ""}
                           onChangeText={(text) =>
-                            setAnswers((prev) => ({
-                              ...prev,
-                              [question.questionId]: text,
-                            }))
+                            setAnswers((prev) => ({ ...prev, [question.questionId]: text }))
                           }
                         />
-                        <TouchableOpacity
-                          style={styles.submitButton}
-                          onPress={() => handleSubmitAnswer(question)}
-                        >
+                        <TouchableOpacity style={styles.submitButton} onPress={() => handleSubmitAnswer(question)}>
                           <Text style={styles.submitButtonText}>ส่งคำตอบ</Text>
                         </TouchableOpacity>
                       </>
@@ -559,20 +522,10 @@ const DetailScreen = ({ route, navigation }) => {
 };
 
 const styles = StyleSheet.create({
-  // ... (เหมือนเดิม)
   container: { flex: 1, backgroundColor: "#f5f5f5" },
   scrollView: { flex: 1, padding: 16 },
-  loadingContainer: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#f5f5f5",
-  },
-  loadingText: {
-    marginTop: 10,
-    color: "#666",
-    fontSize: 16,
-  },
+  loadingContainer: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: "#f5f5f5" },
+  loadingText: { marginTop: 10, color: "#666", fontSize: 16 },
   card: {
     backgroundColor: "#fff",
     borderRadius: 12,
@@ -584,162 +537,33 @@ const styles = StyleSheet.create({
     elevation: 3,
     overflow: "hidden",
   },
-  cardHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: "#e0e0e0",
-    backgroundColor: "#f9f9f9",
-  },
-  cardTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    marginLeft: 10,
-    color: "#333",
-  },
-  cardContent: {
-    padding: 16,
-  },
-  detailRow: {
-    flexDirection: "row",
-    marginBottom: 8,
-  },
-  label: {
-    fontSize: 16,
-    fontWeight: "bold",
-    color: "#333",
-    width: 80,
-  },
-  value: {
-    fontSize: 16,
-    color: "#555",
-    flex: 1,
-    flexWrap: "wrap",
-  },
-  subjectImage: {
-    width: "100%",
-    height: 200,
-    marginTop: 16,
-    borderRadius: 8,
-    backgroundColor: "#eee",
-  },
-  noImageText: {
-    marginTop: 16,
-    fontSize: 14,
-    color: "#999",
-    textAlign: "center",
-  },
-  checkinButton: {
-    flexDirection: "row",
-    backgroundColor: "#3498db",
-    borderRadius: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    alignItems: "center",
-    alignSelf: "flex-start",
-  },
-  checkinButtonText: {
-    color: "#fff",
-    marginLeft: 6,
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  questionContainer: {
-    marginBottom: 16,
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: "#e0e0e0",
-  },
-  questionText: {
-    fontSize: 16,
-    fontWeight: "bold",
-    color: "#333",
-    marginBottom: 8,
-  },
-  answeredContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#eaf6ff",
-    padding: 10,
-    borderRadius: 8,
-  },
-  answeredText: {
-    color: "#3498db",
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  answerInput: {
-    borderWidth: 1,
-    borderColor: "#ccc",
-    borderRadius: 8,
-    padding: 10,
-    marginBottom: 8,
-    fontSize: 16,
-  },
-  submitButton: {
-    backgroundColor: "#3498db",
-    paddingVertical: 12,
-    borderRadius: 8,
-    alignItems: "center",
-    alignSelf: "flex-start",
-  },
-  submitButtonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "600",
-    paddingHorizontal: 16,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.5)",
-    justifyContent: "center",
-    padding: 16,
-  },
-  modalContainer: {
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    padding: 20,
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    marginBottom: 12,
-    color: "#333",
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: "#ccc",
-    borderRadius: 8,
-    padding: 10,
-    marginBottom: 16,
-    fontSize: 16,
-  },
-  remarkInput: {
-    borderWidth: 1,
-    borderColor: "#ccc",
-    borderRadius: 8,
-    minHeight: 80,
-    padding: 10,
-    marginBottom: 16,
-    fontSize: 16,
-    textAlignVertical: "top",
-  },
-  modalButtonContainer: {
-    flexDirection: "row",
-    justifyContent: "flex-end",
-  },
-  modalButton: {
-    borderRadius: 8,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    marginLeft: 8,
-  },
-  modalButtonText: {
-    color: "#fff",
-    fontWeight: "600",
-    fontSize: 16,
-  },
+  cardHeader: { flexDirection: "row", alignItems: "center", padding: 16, borderBottomWidth: 1, borderBottomColor: "#e0e0e0", backgroundColor: "#f9f9f9" },
+  cardTitle: { fontSize: 18, fontWeight: "600", marginLeft: 10, color: "#333" },
+  cardContent: { padding: 16 },
+  detailRow: { flexDirection: "row", marginBottom: 8 },
+  label: { fontSize: 16, fontWeight: "bold", color: "#333", width: 80 },
+  value: { fontSize: 16, color: "#555", flex: 1, flexWrap: "wrap" },
+  subjectImage: { width: "100%", height: 200, marginTop: 16, borderRadius: 8, backgroundColor: "#eee" },
+  noImageText: { marginTop: 16, fontSize: 14, color: "#999", textAlign: "center" },
+  checkinButton: { flexDirection: "row", backgroundColor: "#3498db", borderRadius: 8, paddingVertical: 12, paddingHorizontal: 16, alignItems: "center", alignSelf: "flex-start" },
+  checkinButtonText: { color: "#fff", marginLeft: 6, fontSize: 16, fontWeight: "600" },
+  checkedInContainer: { flexDirection: "row", alignItems: "center", backgroundColor: "#d0f0c0", padding: 10, borderRadius: 8 },
+  checkedInText: { color: "#4CAF50", fontSize: 16, fontWeight: "600" },
+  questionContainer: { marginBottom: 16, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: "#e0e0e0" },
+  questionText: { fontSize: 16, fontWeight: "bold", color: "#333", marginBottom: 8 },
+  answeredContainer: { flexDirection: "row", alignItems: "center", backgroundColor: "#eaf6ff", padding: 10, borderRadius: 8 },
+  answeredText: { color: "#3498db", fontSize: 16, fontWeight: "600" },
+  answerInput: { borderWidth: 1, borderColor: "#ccc", borderRadius: 8, padding: 10, marginBottom: 8, fontSize: 16 },
+  submitButton: { backgroundColor: "#3498db", paddingVertical: 12, borderRadius: 8, alignItems: "center", alignSelf: "flex-start" },
+  submitButtonText: { color: "#fff", fontSize: 16, fontWeight: "600", paddingHorizontal: 16 },
+  modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", padding: 16 },
+  modalContainer: { backgroundColor: "#fff", borderRadius: 12, padding: 20 },
+  modalTitle: { fontSize: 18, fontWeight: "bold", marginBottom: 12, color: "#333" },
+  input: { borderWidth: 1, borderColor: "#ccc", borderRadius: 8, padding: 10, marginBottom: 16, fontSize: 16 },
+  remarkInput: { borderWidth: 1, borderColor: "#ccc", borderRadius: 8, minHeight: 80, padding: 10, marginBottom: 16, fontSize: 16, textAlignVertical: "top" },
+  modalButtonContainer: { flexDirection: "row", justifyContent: "flex-end" },
+  modalButton: { borderRadius: 8, paddingVertical: 10, paddingHorizontal: 16, marginLeft: 8 },
+  modalButtonText: { color: "#fff", fontWeight: "600", fontSize: 16 },
 });
 
 export default DetailScreen;
