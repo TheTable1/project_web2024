@@ -288,23 +288,14 @@ class App extends React.Component {
           <Card.Body>
             <LoginBox user={this.state.user} app={this} />
             {user && (
-              <div>
-                <Button
-                  variant="success"
-                  className="mt-2"
-                  onClick={this.toggleSubjects}
-                >
+              <div >
+                <Button style={{ backgroundColor: "#6c757d", borderColor: "#6c757d" }} className="text-white mt-2" onClick={this.toggleSubjects}>
                   <i className="bi bi-pencil-square me-2"></i> Subject
                 </Button>
-                <Button
-                  variant="success"
-                  className="mt-2 ms-3"
-                  onClick={this.toggleClassroom}
-                >
+                <Button style={{ backgroundColor: "#6c757d", borderColor: "#6c757d" }} className="text-white mt-2 ms-3" onClick={this.toggleClassroom}>
                   <i className="bi bi-pencil-square me-2"></i> Classroom
                 </Button>
-              </div>
-            )}
+              </div>)}
             {user && showSubjects && (
               <div className="mt-4">
                 <h3 className="mb-3" style={{ color: "black" }}>
@@ -312,7 +303,7 @@ class App extends React.Component {
                 </h3>
 
                 {/* ฟอร์มสำหรับเพิ่มวิชาใหม่ */}
-                <Row className="mb-3">
+                <Row className="mb-3 align-items-center">
                   <Col md={3}>
                     <Form.Control
                       type="text"
@@ -340,13 +331,16 @@ class App extends React.Component {
                       className="mb-2"
                     />
                   </Col>
-                  <Col md={3}>
+                  <Col md={3} className="d-flex align-items-center">
+                    {/* ปุ่ม Select Avatar */}
                     <Button
-                      variant="info"
-                      onClick={() =>
-                        this.setState({ showSubjectAvatarModal: true })
-                      }
-                      className="mb-2"
+                      className="fw-bold shadow-sm me-2"
+                      style={{
+                        backgroundColor: "#6c757d", // สีเทา
+                        borderColor: "#5a6268",
+                        color: "#ffffff",
+                      }}
+                      onClick={() => this.setState({ showSubjectAvatarModal: true })}
                     >
                       Select Avatar
                     </Button>
@@ -355,19 +349,25 @@ class App extends React.Component {
                         src={this.state.newPhoto}
                         alt="Selected Avatar"
                         style={{
-                          width: "60px",
-                          height: "60px",
+                          width: "50px",
+                          height: "50px",
                           borderRadius: "50%",
-                          marginTop: "5px",
+                          border: "2px solid #5a6268",
                         }}
                       />
                     )}
                   </Col>
+
                   <Col md={3}>
+                    {/* ปุ่ม Add Subject ให้อยู่ระดับเดียวกับ Select Avatar */}
                     <Button
-                      variant="success"
+                      className="fw-bold shadow-sm w-100"
+                      style={{
+                        backgroundColor: "#6c757d", // สีเทา
+                        borderColor: "#5a6268",
+                        color: "#ffffff",
+                      }}
                       onClick={this.addSubject}
-                      className="w-100"
                     >
                       Add Subject
                     </Button>
@@ -428,8 +428,8 @@ class App extends React.Component {
 // Component: SubjectTable
 function SubjectTable({ subjects, onDelete, onEdit }) {
   return (
-    <Table striped bordered hover responsive className="mt-4">
-      <thead className="table-dark">
+    <Table striped bordered hover responsive className="mt-4 shadow-sm">
+      <thead className="table-primary text-white text-center">
         <tr>
           <th>Subject Code</th>
           <th>Subject Name</th>
@@ -2138,7 +2138,7 @@ function EditSubjectModal({
             />
           </Form.Group>
           <Form.Group className="mb-3">
-            <Button variant="info" onClick={() => setShowAvatarModal(true)}>
+            <Button variant="success" className="px-3 fw-bold shadow-sm" style={{ backgroundColor: "#2ecc71", borderColor: "#27ae60" }}>
               Select Avatar
             </Button>
             {avatar && (
