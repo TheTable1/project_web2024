@@ -627,61 +627,65 @@ function SubjectDetail({ subject, onBack, userId }) {
 
   const handleAddCheckin = async () => {
     if (!newCheckinCode.trim()) {
-      alert("กรุณากรอกรหัสเช็คชื่อ");
-      return;
+        alert("กรุณากรอกรหัสเช็คชื่อ");
+        return;
     }
 
     try {
-      const checkinCollectionRef = db
-        .collection("users")
-        .doc(userId)
-        .collection("classroom")
-        .doc(subject.id);
+        const checkinCollectionRef = db
+            .collection("users")
+            .doc(userId)
+            .collection("classroom")
+            .doc(subject.id);
 
-      // 🔹 Get the latest check-in document to determine the next `cno`
-      const latestCheckinSnapshot = await checkinCollectionRef
-        .collection("checkin")
-        .orderBy("cno", "desc")
-        .limit(1)
-        .get();
+        // 🔹 Get the latest check-in document to determine the next `cno`
+        const latestCheckinSnapshot = await checkinCollectionRef
+            .collection("checkin")
+            .orderBy("cno", "desc")
+            .limit(1)
+            .get();
 
-      let newCno = 1; // Default to 1 if no check-ins exist
-      if (!latestCheckinSnapshot.empty) {
-        const latestCheckin = latestCheckinSnapshot.docs[0].data();
-        newCno = latestCheckin.cno + 1; // Increment `cno`
-      }
+        let newCno = 1; // Default to 1 if no check-ins exist
+        if (!latestCheckinSnapshot.empty) {
+            const latestCheckin = latestCheckinSnapshot.docs[0].data();
+            newCno = latestCheckin.cno + 1; // Increment `cno`
+        }
 
-      // 🔹 Add new check-in document
-      const newCheckinRef = checkinCollectionRef.collection("checkin").doc(newCno.toString());
-      await newCheckinRef.set({
-        cno: newCno,
-        code: newCheckinCode.trim(),
-        date: firebase.firestore.FieldValue.serverTimestamp(),
-        status: 0, // Default to "Not started"
-      });
+        // 🔹 Add new check-in document
+        const newCheckinRef = checkinCollectionRef.collection("checkin").doc(newCno.toString());
+        await newCheckinRef.set({
+            cno: newCno,
+            code: newCheckinCode.trim(),
+            date: firebase.firestore.FieldValue.serverTimestamp(),
+            status: 0, // Default to "Not started"
+        });
 
-      // 🔹 Fetch students from classroom/students collection
-      const studentCollectionRef = await checkinCollectionRef.collection("students").get();
+        // 🔹 Fetch students from classroom/students collection
+        const studentCollectionRef = await checkinCollectionRef.collection("students").get();
 
-      // 🔹 Copy each student to checkin/{newCno}/students
-      const checkinStudentCollection = newCheckinRef.collection("scores");
+        // 🔹 Copy each student to checkin/{newCno}/scores with `status: 0`
+        const checkinStudentCollection = newCheckinRef.collection("scores");
 
-      const batch = db.batch(); // Use batch to reduce writes
-      studentCollectionRef.forEach((studentDoc) => {
-        const studentData = studentDoc.data();
-        const studentRef = checkinStudentCollection.doc(studentDoc.id); // Keep the same student ID
-        batch.set(studentRef, studentData);
-      });
+        const batch = db.batch(); // Use batch to reduce writes
+        studentCollectionRef.forEach((studentDoc) => {
+            const studentData = studentDoc.data();
+            const studentRef = checkinStudentCollection.doc(studentDoc.id); // Keep the same student ID
+            batch.set(studentRef, {
+                ...studentData,
+                status: 0, // Initialize status to 0
+            });
+        });
 
-      await batch.commit(); // Execute all writes at once
+        await batch.commit(); // Execute all writes at once
 
-      setNewCheckinCode(""); // Clear input
-      alert("เพิ่มเช็คชื่อสำเร็จ!");
-      fetchCheckinList(); // Refresh check-in list
+        setNewCheckinCode(""); // Clear input
+        alert("เพิ่มเช็คชื่อสำเร็จ!");
+        fetchCheckinList(); // Refresh check-in list
     } catch (error) {
-      console.error("Error adding check-in:", error);
+        console.error("Error adding check-in:", error);
     }
-  };
+};
+
 
   const handleAddStudent = async () => {
     if (!studentCode) {
@@ -1967,7 +1971,9 @@ function SubjectDetail({ subject, onBack, userId }) {
                           {score.date}
                         </td>
                         <td>{score.score || "-"}</td>
-                        <td>{score.status || "-"}</td>
+                        <td>
+  {score.status === 0 ? "ขาด" : score.status === 1 ? "เข้าเรียน" : score.status === 2 ? "มาสาย" : "-"}
+</td>
                         <td>
                           <Button
                             variant="danger"
