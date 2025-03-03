@@ -2008,37 +2008,6 @@ function SubjectDetail({ subject, onBack, userId }) {
               <button onClick={handleCancelEdit}>Cancel</button>
             </div>
           )}
-
-
-        </div>
-      )}
-
-      {showScoresList && (
-        <div className="mt-4">
-          <h5>คะแนนผู้เช็คชื่อ</h5>
-          <Table striped bordered hover responsive>
-            <thead className="table-dark">
-              <tr>
-                <th>ลำดับ</th>
-                <th>รหัส</th>
-                <th>ชื่อ</th>
-                <th>หมายเหตุ</th>
-                <th>วันเวลา</th>
-                <th>คะแนน</th>
-                <th>สถานะ</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {scores.map((score, index) => (
-                <tr key={score.id}>
-                  <td>{index + 1}</td>
-                  <td>{score.code || "-"}</td>
-                  <td>{score.name || "-"}</td>
-                </tr>
-              ))}
-            </tbody>
-          </Table>
         </div>
       )}
     </div>
