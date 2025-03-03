@@ -4,7 +4,9 @@ import { createStackNavigator } from "@react-navigation/stack";
 import LoginScreen from "./LoginScreen";
 import RegisterScreen from "./RegisterScreen";
 import HomeScreen from "./HomeScreen";
+import OTPScreen from "./OTPScreen";
 import DetailScreen from "./DetailScreen";
+import { Entypo, MaterialIcons } from "@expo/vector-icons";
 
 const Stack = createStackNavigator();
 
@@ -20,17 +22,22 @@ export default function App() {
         <Stack.Screen
           name="Register"
           component={RegisterScreen}
-          options={{ title: "ลงทะเบียน" }}
+          options={{ headerShown: false }}
         />
         <Stack.Screen
           name="Home"
           component={HomeScreen}
-          options={{ title: "หน้าหลัก" }}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="OTPLogin"
+          component={OTPScreen}
+          options={{ headerShown: false }}
         />
         <Stack.Screen
           name="DetailScreen"
           component={DetailScreen}
-          options={{ title: "รายละเอียดวิชา" }}
+          options={{ headerShown: false }}
         />
       </Stack.Navigator>
     </NavigationContainer>

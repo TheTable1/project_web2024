@@ -1,88 +1,260 @@
 import React, { useState } from "react";
-import { View, Text, TextInput, Button, Alert } from "react-native";
-import { auth } from "./firebase";
-import { signInWithEmailAndPassword, signInWithPhoneNumber, RecaptchaVerifier } from "firebase/auth";
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  Alert,
+  ActivityIndicator,
+  SafeAreaView,
+  KeyboardAvoidingView,
+  Platform,
+  Image,
+} from "react-native";
+import { auth, signInWithEmailAndPassword } from "./firebase";
+import { MaterialIcons } from "@expo/vector-icons";
 
 const LoginScreen = ({ navigation }) => {
+  const [showPhoneLogin, setShowPhoneLogin] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [phoneNumber, setPhoneNumber] = useState("");
-  const [verificationId, setVerificationId] = useState(null);
-  const [otpCode, setOtpCode] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  // ✅ ฟังก์ชันเข้าสู่ระบบด้วย Email/Password
-  const handleLogin = async () => {
+  const handleEmailLogin = async () => {
     if (!email || !password) {
-      Alert.alert("Error", "กรุณากรอก Email และ Password");
+      Alert.alert("กรุณากรอกข้อมูล", "โปรดกรอกอีเมลและรหัสผ่าน");
       return;
     }
 
+    setLoading(true);
     try {
       await signInWithEmailAndPassword(auth, email, password);
-      Alert.alert("เข้าสู่ระบบสำเร็จ!");
-      navigation.navigate("Home");
+      setLoading(false);
+      navigation.replace("Home");
     } catch (error) {
-      Alert.alert("Error", error.message);
+      setLoading(false);
+      Alert.alert("เข้าสู่ระบบไม่สำเร็จ", error.message);
     }
   };
 
-  // ✅ ฟังก์ชันส่ง OTP ไปที่เบอร์โทร
-  const sendOtp = async () => {
-    if (!phoneNumber) {
-      Alert.alert("Error", "กรุณากรอกหมายเลขโทรศัพท์");
-      return;
-    }
-
-    try {
-      const recaptchaVerifier = new RecaptchaVerifier(auth, "recaptcha-container", { size: "invisible" });
-      const confirmation = await signInWithPhoneNumber(auth, phoneNumber, recaptchaVerifier);
-      setVerificationId(confirmation.verificationId);
-      Alert.alert("OTP ถูกส่งแล้ว กรุณากรอก OTP ที่ได้รับ");
-    } catch (error) {
-      Alert.alert("Error", "ไม่สามารถส่ง OTP ได้");
-    }
-  };
-
-  // ✅ ฟังก์ชันยืนยัน OTP
-  const verifyOtp = async () => {
-    if (!verificationId || !otpCode) {
-      Alert.alert("Error", "กรุณากรอก OTP");
-      return;
-    }
-
-    try {
-      const credential = PhoneAuthProvider.credential(verificationId, otpCode);
-      await signInWithCredential(auth, credential);
-      Alert.alert("เข้าสู่ระบบสำเร็จด้วย OTP!");
-      navigation.navigate("Home");
-    } catch (error) {
-      Alert.alert("Error", "OTP ไม่ถูกต้อง");
-    }
+  const handlePhoneLogin = () => {
+    navigation.navigate("OTPLogin");
   };
 
   return (
-    <View style={{ flex: 1, justifyContent: "center", padding: 20 }}>
-      <Text style={{ fontSize: 22, fontWeight: "bold", marginBottom: 10 }}>เข้าสู่ระบบ</Text>
+    <SafeAreaView style={styles.container}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={styles.keyboardView}
+      >
+        <View style={styles.header}>
+          <Text style={styles.title}>เข้าสู่ระบบ</Text>
+          <Text style={styles.subtitle}>เข้าสู่ระบบเพื่อใช้งานแอปพลิเคชัน</Text>
+        </View>
 
-      {/* ✅ Login ด้วย Email/Password */}
-      <TextInput placeholder="Email" value={email} onChangeText={setEmail} keyboardType="email-address" />
-      <TextInput placeholder="Password" value={password} onChangeText={setPassword} secureTextEntry />
-      <Button title="เข้าสู่ระบบด้วย Email" onPress={handleLogin} />
+        <View style={styles.tabContainer}>
+          <TouchableOpacity
+            style={[styles.tab, !showPhoneLogin ? styles.activeTab : null]}
+            onPress={() => setShowPhoneLogin(false)}
+          >
+            <Text style={!showPhoneLogin ? styles.activeTabText : styles.tabText}>
+              อีเมล
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tab, showPhoneLogin ? styles.activeTab : null]}
+            onPress={() => setShowPhoneLogin(true)}
+          >
+            <Text style={showPhoneLogin ? styles.activeTabText : styles.tabText}>
+              เบอร์โทรศัพท์
+            </Text>
+          </TouchableOpacity>
+        </View>
 
-      {/* ✅ ไปหน้าสมัครสมาชิก */}
-      <Button title="สมัครสมาชิก" onPress={() => navigation.navigate("Register")} color="green" />
+        {!showPhoneLogin ? (
+          <View style={styles.formContainer}>
+            <View style={styles.inputContainer}>
+              <MaterialIcons name="email" size={24} color="#666" />
+              <TextInput
+                style={styles.input}
+                placeholder="อีเมล"
+                value={email}
+                onChangeText={setEmail}
+                keyboardType="email-address"
+                autoCapitalize="none"
+              />
+            </View>
+            <View style={styles.inputContainer}>
+              <MaterialIcons name="lock" size={24} color="#666" />
+              <TextInput
+                style={styles.input}
+                placeholder="รหัสผ่าน"
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry
+              />
+            </View>
+            <TouchableOpacity
+              style={styles.button}
+              onPress={handleEmailLogin}
+              disabled={loading}
+            >
+              <Text style={styles.buttonText}>
+                {loading ? "กำลังเข้าสู่ระบบ..." : "เข้าสู่ระบบ"}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <View style={styles.formContainer}>
+            <View style={styles.phoneContainer}>
+              <MaterialIcons name="phone-android" size={50} color="#3498db" />
+              <Text style={styles.phoneLoginText}>เข้าสู่ระบบด้วยเบอร์โทรศัพท์</Text>
+              <Text style={styles.phoneSubtext}>
+                เราจะส่งข้อความยืนยันไปยังเบอร์โทรศัพท์ของคุณ
+              </Text>
+            </View>
+            <TouchableOpacity
+              style={styles.phoneButton}
+              onPress={handlePhoneLogin}
+            >
+              <Text style={styles.buttonText}>ไปยังหน้าเข้าสู่ระบบด้วย OTP</Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
-      <View style={{ marginVertical: 20 }} />
-
-      {/* ✅ Login ด้วย OTP */}
-      <TextInput placeholder="Phone Number (+66xxxxxxxxx)" value={phoneNumber} onChangeText={setPhoneNumber} keyboardType="phone-pad" />
-      <Button title="ส่ง OTP" onPress={sendOtp} />
-      <TextInput placeholder="OTP Code" value={otpCode} onChangeText={setOtpCode} keyboardType="numeric" />
-      <Button title="ยืนยัน OTP" onPress={verifyOtp} />
-
-      <View id="recaptcha-container"></View>
-    </View>
+        <View style={styles.footer}>
+          <Text style={styles.footerText}>ยังไม่มีบัญชี? </Text>
+          <TouchableOpacity onPress={() => navigation.navigate("Register")}>
+            <Text style={styles.footerLink}>สมัครสมาชิก</Text>
+          </TouchableOpacity>
+        </View>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 };
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: "#F5F5F5",
+  },
+  keyboardView: {
+    flex: 1,
+    justifyContent: "center",
+    padding: 20,
+  },
+  header: {
+    alignItems: "center",
+    marginBottom: 30,
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: "bold",
+    color: "#333",
+    marginBottom: 10,
+  },
+  subtitle: {
+    fontSize: 16,
+    color: "#666",
+  },
+  tabContainer: {
+    flexDirection: "row",
+    marginBottom: 20,
+    borderRadius: 8,
+    overflow: "hidden",
+    backgroundColor: "#E0E0E0",
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: 12,
+    alignItems: "center",
+  },
+  activeTab: {
+    backgroundColor: "#3498db",
+  },
+  tabText: {
+    fontWeight: "600",
+    color: "#333",
+  },
+  activeTabText: {
+    fontWeight: "600",
+    color: "#FFFFFF",
+  },
+  formContainer: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 10,
+    padding: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 3,
+    marginBottom: 20,
+  },
+  inputContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#DDD",
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    marginBottom: 15,
+  },
+  input: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    fontSize: 16,
+  },
+  button: {
+    backgroundColor: "#3498db",
+    borderRadius: 8,
+    paddingVertical: 14,
+    alignItems: "center",
+    marginTop: 10,
+  },
+  buttonText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  phoneContainer: {
+    alignItems: "center",
+    padding: 10,
+  },
+  phoneLoginText: {
+    fontSize: 18,
+    fontWeight: "bold",
+    marginTop: 15,
+    marginBottom: 5,
+  },
+  phoneSubtext: {
+    fontSize: 14,
+    color: "#666",
+    textAlign: "center",
+    marginBottom: 20,
+  },
+  phoneButton: {
+    backgroundColor: "#28a745",
+    borderRadius: 8,
+    paddingVertical: 14,
+    alignItems: "center",
+  },
+  footer: {
+    flexDirection: "row",
+    justifyContent: "center",
+    marginTop: 20,
+  },
+  footerText: {
+    color: "#666",
+    fontSize: 16,
+  },
+  footerLink: {
+    color: "#3498db",
+    fontSize: 16,
+    fontWeight: "bold",
+  },
+});
 
 export default LoginScreen;

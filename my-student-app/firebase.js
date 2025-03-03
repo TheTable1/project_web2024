@@ -1,8 +1,28 @@
 import { initializeApp } from "firebase/app";
-import { initializeAuth, getReactNativePersistence } from "firebase/auth";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { getFirestore } from "firebase/firestore";
+import {
+  getAuth,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signInWithPhoneNumber,
+  PhoneAuthProvider,
+  signInWithCredential,
+  signOut,
+  onAuthStateChanged,
+} from "firebase/auth";
+import {
+  getFirestore,
+  doc,
+  getDoc,
+  setDoc,
+  collection,
+  getDocs,
+  query,
+  where,
+  updateDoc,
+  arrayUnion,
+} from "firebase/firestore";
 
+// Firebase configuration
 const firebaseConfig = {
   apiKey: "AIzaSyDrjydWmT19vEJu6zvsJCZk-iLg5P9G_9c",
   authDomain: "web2567teungteung.firebaseapp.com",
@@ -13,11 +33,30 @@ const firebaseConfig = {
   measurementId: "G-LVKQEQ5Z67",
 };
 
-// 🔹 Initialize Firebase
+// Initialize Firebase
 const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
 const db = getFirestore(app);
-const auth = initializeAuth(app, {
-  persistence: getReactNativePersistence(AsyncStorage), // ✅ แก้ตรงนี้
-});
 
-export { auth, db };
+export {
+  firebaseConfig,
+  app,
+  auth,
+  db,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signInWithPhoneNumber,
+  PhoneAuthProvider,
+  signInWithCredential,
+  signOut,
+  onAuthStateChanged,
+  doc,
+  getDoc,
+  setDoc,
+  collection,
+  getDocs,
+  query,
+  where,
+  updateDoc,
+  arrayUnion,
+};
