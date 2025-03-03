@@ -1956,7 +1956,7 @@ function SubjectDetail({ subject, onBack, userId }) {
                         </td>
                         <td>{score.score || "-"}</td>
                         <td>
-                          {score.status === 0 ? "ขาด" : score.status === 1 ? "เข้าเรียน" : score.status === 2 ? "มาสาย" : "-"}
+                          {score.status === "0" ? "ขาด" : score.status === "1" ? "เข้าเรียน" : score.status === "2" ? "มาสาย" : "-"}
                         </td>
                         <td>
                           <Button
