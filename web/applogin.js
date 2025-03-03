@@ -1402,9 +1402,6 @@ function SubjectDetail({ subject, onBack, userId }) {
             >
               แสดง QRCode วิชา
             </Button>
-            <Button variant="secondary" onClick={openQA} className="me-2">
-              ถาม-ตอบ
-            </Button>
           </div>
           <div className="mb-2">
             <Button variant="dark" onClick={fetchStudents} className="me-2">
