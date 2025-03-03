@@ -533,16 +533,6 @@ function SubjectDetail({ subject, onBack, userId }) {
     window.location.href = `manage_questions.html?subjectId=${subjectId}`;
   };
 
-  // ตัวอย่างการเรียกใช้ (จากปุ่ม)
-  <Button
-    variant="secondary"
-    size="sm"
-    className="rounded-3 fw-bold"
-    onClick={() => openQA("CP001002")} // ใส่ subjectId ที่ต้องการ
-  >
-    ถาม-ตอบ
-  </Button>;
-
   const fetchStudentStatus = async (studentId) => {
     try {
       // Fetch the student's document from the students sub-collection
@@ -1420,9 +1410,6 @@ function SubjectDetail({ subject, onBack, userId }) {
             <Button variant="dark" onClick={fetchStudents} className="me-2">
               แสดงรายชื่อ
             </Button>
-            <Button variant="dark" onClick={toggleScoresList} className="me-2">
-              แสดงคะแนน
-            </Button>
             <Row>
               <Col md={3}>
                 <Form.Control
@@ -1798,7 +1785,7 @@ function SubjectDetail({ subject, onBack, userId }) {
                 <th>ชื่อ</th>
                 <th>หมายเหตุ</th>
                 <th>วันเวลา</th>
-                <th>มามั้ย</th>
+                <th>สถานะ</th>
                 <th>Actions</th>
               </tr>
             </thead>
