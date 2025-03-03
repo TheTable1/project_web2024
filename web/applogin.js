@@ -1004,7 +1004,7 @@ function SubjectDetail({ subject, onBack, userId }) {
   };
 
   const handleViewQuestion = async (questionId) => {
-    
+
     try {
       // Validate input
       if (!userId || !subject?.id || !selectedCheckin || !questionId) {
@@ -1220,7 +1220,7 @@ function SubjectDetail({ subject, onBack, userId }) {
 
   const fetchStudentCounts = async () => {
     const counts = {}; // Store fetched counts
-  
+
     for (const checkin of checkinList) {
       const studentsRef = db
         .collection("users")
@@ -1230,7 +1230,7 @@ function SubjectDetail({ subject, onBack, userId }) {
         .collection("checkin")
         .doc(checkin.id)
         .collection("students");
-  
+
       try {
         const snapshot = await studentsRef.get();
         counts[checkin.id] = snapshot.size; // Store student count
@@ -1239,10 +1239,10 @@ function SubjectDetail({ subject, onBack, userId }) {
         counts[checkin.id] = 0; // Default to 0 if there's an error
       }
     }
-  
+
     setStudentCounts(counts); // Update state
   };
-  
+
   // Run function when `checkinList` updates
   React.useEffect(() => {
     if (checkinList.length > 0) {
@@ -1576,65 +1576,65 @@ function SubjectDetail({ subject, onBack, userId }) {
           </Row>
 
           <Table striped bordered hover responsive>
-  <thead className="table-dark">
-    <tr>
-      <th>ลำดับ</th>
-      <th>รหัส</th>
-      <th>เวลาเช็คชื่อ</th>
-      <th>สถานะ</th>
-      <th>จำนวนนักศึกษา</th> {/* New column */}
-      <th>Actions</th>
-    </tr>
-  </thead>
-  <tbody>
-    {checkinList.map((checkin, index) => (
-      <tr key={checkin.id}>
-        <td>{index + 1}</td>
-        <td>{checkin.code}</td>
-        <td>
-          {checkin.date?.seconds
-            ? new Date(checkin.date.seconds * 1000).toLocaleString("th-TH", {
-                day: "2-digit",
-                month: "2-digit",
-                year: "numeric",
-                hour: "2-digit",
-                minute: "2-digit",
-                hour12: false,
-              })
-            : "N/A"}
-        </td>
-        <td>
-          {checkin.status === 0
-            ? "ยังไม่เริ่ม"
-            : checkin.status === 1
-            ? "กำลังเช็คชื่อ"
-            : "เสร็จแล้ว"}
-        </td>
-        <td>{studentCounts[checkin.id] ?? "Loading..."}</td> {/* Student count */}
-        <td>
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={() => {
-              handleViewCheckin(checkin.id);
-              setShowQuestionList(false);
-              setSelectedQuestion(null);
-            }}
-          >
-            View
-          </Button>
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={() => handleDeleteCheckin(checkin.id)}
-          >
-            Delete
-          </Button>
-        </td>
-      </tr>
-    ))}
-  </tbody>
-</Table>
+            <thead className="table-dark">
+              <tr>
+                <th>ลำดับ</th>
+                <th>รหัส</th>
+                <th>เวลาเช็คชื่อ</th>
+                <th>สถานะ</th>
+                <th>จำนวนนักศึกษา</th> {/* New column */}
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {checkinList.map((checkin, index) => (
+                <tr key={checkin.id}>
+                  <td>{index + 1}</td>
+                  <td>{checkin.code}</td>
+                  <td>
+                    {checkin.date?.seconds
+                      ? new Date(checkin.date.seconds * 1000).toLocaleString("th-TH", {
+                        day: "2-digit",
+                        month: "2-digit",
+                        year: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        hour12: false,
+                      })
+                      : "N/A"}
+                  </td>
+                  <td>
+                    {checkin.status === 0
+                      ? "ยังไม่เริ่ม"
+                      : checkin.status === 1
+                        ? "กำลังเช็คชื่อ"
+                        : "เสร็จแล้ว"}
+                  </td>
+                  <td>{studentCounts[checkin.id] ?? "Loading..."}</td> {/* Student count */}
+                  <td>
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={() => {
+                        handleViewCheckin(checkin.id);
+                        setShowQuestionList(false);
+                        setSelectedQuestion(null);
+                      }}
+                    >
+                      View
+                    </Button>
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={() => handleDeleteCheckin(checkin.id)}
+                    >
+                      Delete
+                    </Button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </Table>
 
         </div>
       )}
