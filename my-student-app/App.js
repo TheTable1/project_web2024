@@ -5,6 +5,7 @@ import LoginScreen from "./LoginScreen";
 import RegisterScreen from "./RegisterScreen";
 import HomeScreen from "./HomeScreen";
 import OTPScreen from "./OTPScreen";
+import DetailScreen from "./DetailScreen";
 import { Entypo, MaterialIcons } from '@expo/vector-icons';
 
 const Stack = createStackNavigator();
@@ -31,6 +32,11 @@ export default function App() {
         <Stack.Screen 
           name="OTPLogin" 
           component={OTPScreen} 
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen 
+          name="DetailScreen" 
+          component={DetailScreen} 
           options={{ headerShown: false }}
         />
       </Stack.Navigator>
