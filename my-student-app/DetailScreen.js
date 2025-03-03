@@ -3,7 +3,6 @@ import {
   View,
   Text,
   ActivityIndicator,
-  Image,
   ScrollView,
   StyleSheet,
   SafeAreaView,
@@ -23,37 +22,6 @@ import {
 import { db, auth } from "./firebase";
 import { MaterialIcons } from "@expo/vector-icons";
 
-// const getLocalImage = (path) => {
-//   switch (path) {
-//     case "/project_web2024/web/default-subject.jpg":
-//       return require("./assets/default-subject.jpg");
-//     case "/project_web2024/web/default-subject1.jpg":
-//       return require("./assets/default-subject1.jpg");
-//     case "/project_web2024/web/default-subject2.jpg":
-//       return require("./assets/default-subject2.jpg");
-//     case "/project_web2024/web/default-subject3.jpg":
-//       return require("./assets/default-subject3.jpg");
-//     case "/project_web2024/web/default-subject4.jpg":
-//       return require("./assets/default-subject4.jpg");
-//     case "/project_web2024/web/default-subject5.jpg":
-//       return require("./assets/default-subject5.jpg");
-//     case "/project_web2024/web/default-subject6.jpg":
-//       return require("./assets/default-subject6.jpg");
-//     case "/project_web2024/web/default-subject7.jpg":
-//       return require("./assets/default-subject7.jpg");
-//     case "/project_web2024/web/default-subject8.jpg":
-//       return require("./assets/default-subject8.jpg");
-//     case "/project_web2024/web/default-subject9.jpg":
-//       return require("./assets/default-subject9.jpg");
-//     case "/project_web2024/web/default-subject10.jpg":
-//       return require("./assets/default-subject10.jpg");
-//     case "/project_web2024/web/default-subject11.jpg":
-//       return require("./assets/default-subject11.jpg");
-//     default:
-//       return <h1>w,j,</h1>;
-//   }
-// };
-
 const DetailScreen = ({ route, navigation }) => {
   const { classId } = route.params;
 
@@ -69,15 +37,13 @@ const DetailScreen = ({ route, navigation }) => {
 
   // คำถามและคำตอบ
   const [questionList, setQuestionList] = useState([]);
-  // state นี้เก็บคำตอบจาก Firestore โดยอ่านจาก field "text"
   const [questionAnswers, setQuestionAnswers] = useState({});
-  // state สำหรับเก็บข้อความที่ผู้ใช้พิมพ์ (ก่อนส่ง)
   const [answers, setAnswers] = useState({});
 
-  // รหัสนักศึกษา (stid) ที่ได้จากเอกสารใน /users
+  // รหัสนักศึกษา (stid)
   const [studentId, setStudentId] = useState("");
 
-  // สำหรับ Modal เช็คอิน
+  // Modal เช็คอิน
   const [showCheckInModal, setShowCheckInModal] = useState(false);
   const [modalStep, setModalStep] = useState("code");
   const [checkinCodeInput, setCheckinCodeInput] = useState("");
@@ -89,7 +55,7 @@ const DetailScreen = ({ route, navigation }) => {
     fetchClassDetailsUpdated();
   }, [classId]);
 
-  // เมื่อหน้า DetailScreen ถูก focus ให้ re‑fetch checkin, คำถาม และคำตอบ
+  // เมื่อหน้า DetailScreen ถูก focus ให้ re-fetch checkin, คำถาม และคำตอบ
   useEffect(() => {
     const unsubscribe = navigation.addListener("focus", async () => {
       if (ownerUid && studentId) {
@@ -104,13 +70,12 @@ const DetailScreen = ({ route, navigation }) => {
     const fetchStudentId = async () => {
       const user = auth.currentUser;
       if (!user) return;
-      let userDoc = await getDoc(doc(db, "Student", user.uid));
-      if (!userDoc.exists()) {
-        userDoc = await getDoc(doc(db, "users", user.uid));
+      let userDocSnap = await getDoc(doc(db, "Student", user.uid));
+      if (!userDocSnap.exists()) {
+        userDocSnap = await getDoc(doc(db, "users", user.uid));
       }
-      if (userDoc.exists()) {
-        // ใช้ stid จากเอกสาร ถ้าไม่มีให้ใช้ uid แทน
-        setStudentId(userDoc.data().stid || user.uid);
+      if (userDocSnap.exists()) {
+        setStudentId(userDocSnap.data().stid || user.uid);
       }
     };
     fetchStudentId();
@@ -122,6 +87,7 @@ const DetailScreen = ({ route, navigation }) => {
       setLoading(true);
       const usersRef = collection(db, "users");
       const usersSnap = await getDocs(usersRef);
+
       let foundDetails = null;
       let foundOwnerUid = null;
       for (const userDoc of usersSnap.docs) {
@@ -136,6 +102,7 @@ const DetailScreen = ({ route, navigation }) => {
           break;
         }
       }
+
       setClassDetails(foundDetails);
       if (foundOwnerUid) {
         setOwnerUid(foundOwnerUid);
@@ -158,6 +125,7 @@ const DetailScreen = ({ route, navigation }) => {
   const fetchQuestionsAndAnswers = async (ownerParam) => {
     const owner = ownerParam || ownerUid;
     if (!owner) return;
+
     try {
       // ดึง checkin ที่มี status = 1
       const checkinRef = collection(
@@ -168,17 +136,20 @@ const DetailScreen = ({ route, navigation }) => {
       const activeCheckins = [];
       const newCheckedInMap = {};
       const currentUser = auth.currentUser;
+
       for (const docSnap of checkinSnap.docs) {
         const data = docSnap.data();
         if (data.status === 1) {
           activeCheckins.push({ id: docSnap.id, ...data });
+
+          // เช็คว่าเคยเช็คชื่อใน scores แล้วหรือยัง
           if (currentUser) {
-            const checkinDocRef = doc(
+            const scoresDocRef = doc(
               db,
-              `users/${owner}/classroom/${classId}/checkin/${docSnap.id}/students/${currentUser.uid}`
+              `users/${owner}/classroom/${classId}/checkin/${docSnap.id}/scores/${currentUser.uid}`
             );
-            const checkinDocSnap = await getDoc(checkinDocRef);
-            newCheckedInMap[docSnap.id] = checkinDocSnap.exists();
+            const scoresDocSnap = await getDoc(scoresDocRef);
+            newCheckedInMap[docSnap.id] = scoresDocSnap.exists();
           }
         }
       }
@@ -207,9 +178,8 @@ const DetailScreen = ({ route, navigation }) => {
       }
       setQuestionList(questionsArr);
 
-      // ดึงคำตอบสำหรับทุกคำถาม (อ่านจาก field "text")
+      // ดึงคำตอบ (ถ้ามี)
       const newAnswers = {};
-      // ใช้ fallback studentId เมื่อค่า studentId ไม่พร้อม
       const effectiveStudentId =
         studentId || (auth.currentUser ? auth.currentUser.uid : "");
       for (const question of questionsArr) {
@@ -228,7 +198,7 @@ const DetailScreen = ({ route, navigation }) => {
     }
   };
 
-  // ฟังก์ชันสำหรับเช็คอิน
+  // กดปุ่ม "เช็คชื่อ"
   const handleCheckInPress = (item) => {
     setSelectedCheckin(item);
     setShowCheckInModal(true);
@@ -237,6 +207,7 @@ const DetailScreen = ({ route, navigation }) => {
     setRemarkText("");
   };
 
+  // ตรวจสอบรหัสเช็คอิน
   const verifyCheckinCode = async () => {
     try {
       if (!selectedCheckin) return;
@@ -252,22 +223,65 @@ const DetailScreen = ({ route, navigation }) => {
     }
   };
 
+  // บันทึกข้อมูลเช็คชื่อไปยัง scores และ students
   const handleSubmitRemark = async () => {
     try {
       const user = auth.currentUser;
       if (!user || !selectedCheckin) return;
-      const docRef = doc(
+
+      // ดึงเวลา date ของเช็คอิน (parent)
+      const parentCheckinRef = doc(
+        db,
+        `users/${ownerUid}/classroom/${classId}/checkin/${selectedCheckin.id}`
+      );
+      const parentCheckinSnap = await getDoc(parentCheckinRef);
+
+      let parentDate = null;
+      if (parentCheckinSnap.exists()) {
+        parentDate = parentCheckinSnap.data().date; // Timestamp
+      }
+
+      // คำนวณ status (1 หรือ 2) จากเวลาห่าง 15 นาที
+      let statusValue = 1;
+      if (parentDate) {
+        const now = new Date(); // เวลาบน client
+        const diffMs = now - parentDate.toDate();
+        const diffMins = diffMs / 60000;
+        if (diffMins > 15) {
+          statusValue = 2;
+        }
+      }
+
+      // 1) บันทึกไปที่ scores
+      const scoresDocRef = doc(
+        db,
+        `users/${ownerUid}/classroom/${classId}/checkin/${selectedCheckin.id}/scores/${user.uid}`
+      );
+      await setDoc(
+        scoresDocRef,
+        {
+          remark: remarkText.trim(),
+          date: serverTimestamp(),
+          score: 0,
+          status: statusValue,
+        },
+        { merge: true }
+      );
+
+      // 2) บันทึกไปที่ students (เฉพาะ date, remark)
+      const studentsDocRef = doc(
         db,
         `users/${ownerUid}/classroom/${classId}/checkin/${selectedCheckin.id}/students/${user.uid}`
       );
       await setDoc(
-        docRef,
+        studentsDocRef,
         {
           remark: remarkText.trim(),
           date: serverTimestamp(),
         },
         { merge: true }
       );
+
       Alert.alert(
         "เช็คชื่อสำเร็จ",
         "บันทึกหมายเหตุและเวลาการเช็คชื่อเรียบร้อย"
@@ -283,30 +297,27 @@ const DetailScreen = ({ route, navigation }) => {
     }
   };
 
-  // ฟังก์ชันส่งคำตอบ
+  // ฟังก์ชันส่งคำตอบคำถาม
   const handleSubmitAnswer = async (question) => {
     try {
       const user = auth.currentUser;
       if (!user) return;
       const userDocRef = doc(db, "users", user.uid);
       const userDocSnap = await getDoc(userDocRef);
-      // ใช้ stid จากเอกสาร ถ้าไม่มีให้ใช้ uid แทน
       const stuId = userDocSnap.exists()
         ? userDocSnap.data().stid || user.uid
-        : "";
-      if (!stuId) {
-        Alert.alert("ไม่พบรหัสนักศึกษา", "กรุณาติดต่อเจ้าหน้าที่");
-        return;
-      }
+        : user.uid;
+
       const ansId = question.answerId || question.questionId;
-      const effectiveStudentId = stuId;
       const answerRef = doc(
         db,
-        `users/${ownerUid}/classroom/${classId}/checkin/${question.checkinId}/answers/${ansId}/students/${effectiveStudentId}`
+        `users/${ownerUid}/classroom/${classId}/checkin/${question.checkinId}/answers/${ansId}/students/${stuId}`
       );
+
       const answerText = answers[question.questionId]
         ? answers[question.questionId].trim()
         : "";
+
       await setDoc(
         answerRef,
         {
@@ -316,6 +327,7 @@ const DetailScreen = ({ route, navigation }) => {
         { merge: true }
       );
       Alert.alert("ส่งคำตอบสำเร็จ", "คำตอบของคุณถูกบันทึกเรียบร้อย");
+
       setQuestionAnswers((prev) => ({
         ...prev,
         [question.questionId]: answerText,
@@ -344,21 +356,13 @@ const DetailScreen = ({ route, navigation }) => {
     );
   }
 
-  let imageSource = null;
-  if (classDetails.photo) {
-    if (classDetails.photo.startsWith("/web")) {
-      imageSource = getLocalImage(classDetails.photo);
-    } else {
-      imageSource = { uri: classDetails.photo };
-    }
-  }
-
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView
         style={styles.scrollView}
         showsVerticalScrollIndicator={false}
       >
+        {/* รายละเอียดวิชา */}
         <View style={styles.card}>
           <View style={styles.cardHeader}>
             <MaterialIcons name="library-books" size={24} color="#3498db" />
@@ -383,18 +387,10 @@ const DetailScreen = ({ route, navigation }) => {
                 <Text style={styles.value}>{ownerName}</Text>
               </View>
             )}
-            {/* {imageSource ? (
-              <Image
-                source={imageSource}
-                style={styles.subjectImage}
-                resizeMode="contain"
-              />
-            ) : (
-              <Text style={styles.noImageText}>ไม่มีรูปภาพ</Text>
-            )} */}
           </View>
         </View>
 
+        {/* รายการเช็คชื่อ */}
         {checkinList.map((item) => (
           <View style={styles.card} key={item.id}>
             <View style={styles.cardHeader}>
@@ -407,6 +403,7 @@ const DetailScreen = ({ route, navigation }) => {
               <Text style={{ marginBottom: 8, color: "#555" }}>
                 {item.description || "ยังไม่มีรายละเอียดสำหรับการเช็คอินนี้"}
               </Text>
+
               {checkedInMap[item.id] ? (
                 <View style={styles.checkedInContainer}>
                   <MaterialIcons
@@ -430,6 +427,7 @@ const DetailScreen = ({ route, navigation }) => {
           </View>
         ))}
 
+        {/* คำถามการเช็คชื่อ (ถ้ามี) */}
         {questionList.length > 0 && (
           <View style={styles.card}>
             <View style={styles.cardHeader}>
@@ -488,6 +486,7 @@ const DetailScreen = ({ route, navigation }) => {
         )}
       </ScrollView>
 
+      {/* Modal สำหรับกรอกรหัสและหมายเหตุ */}
       <Modal
         visible={showCheckInModal}
         transparent
@@ -525,6 +524,7 @@ const DetailScreen = ({ route, navigation }) => {
                 </View>
               </>
             )}
+
             {modalStep === "remark" && (
               <>
                 <Text style={styles.modalTitle}>หมายเหตุ (ไม่บังคับ)</Text>
@@ -596,19 +596,6 @@ const styles = StyleSheet.create({
   detailRow: { flexDirection: "row", marginBottom: 8 },
   label: { fontSize: 16, fontWeight: "bold", color: "#333", width: 80 },
   value: { fontSize: 16, color: "#555", flex: 1, flexWrap: "wrap" },
-  subjectImage: {
-    width: "100%",
-    height: 200,
-    marginTop: 16,
-    borderRadius: 8,
-    backgroundColor: "#eee",
-  },
-  noImageText: {
-    marginTop: 16,
-    fontSize: 14,
-    color: "#999",
-    textAlign: "center",
-  },
   checkinButton: {
     flexDirection: "row",
     backgroundColor: "#3498db",
@@ -679,7 +666,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     padding: 16,
   },
-  modalContainer: { backgroundColor: "#fff", borderRadius: 12, padding: 20 },
+  modalContainer: {
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    padding: 20,
+  },
   modalTitle: {
     fontSize: 18,
     fontWeight: "bold",
