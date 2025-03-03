@@ -519,6 +519,7 @@ function SubjectDetail({ subject, onBack, userId }) {
   const [newStatus, setNewStatus] = React.useState("");
   const [newQuestion, setNewQuestion] = React.useState("");
   const [answers, setAnswers] = React.useState([]);
+  const [studentCounts, setStudentCounts] = React.useState({});
 
 
   // สร้าง URL สำหรับรายละเอียดวิชา (ปรับเปลี่ยนได้ตามโปรเจค)
@@ -1003,7 +1004,7 @@ function SubjectDetail({ subject, onBack, userId }) {
   };
 
   const handleViewQuestion = async (questionId) => {
-
+    
     try {
       // Validate input
       if (!userId || !subject?.id || !selectedCheckin || !questionId) {
@@ -1032,10 +1033,44 @@ function SubjectDetail({ subject, onBack, userId }) {
       const questionData = { id: questionDoc.id, ...questionDoc.data() };
 
       setSelectedQuestion(questionData);
-      fetchAnswers();
+
     } catch (error) {
       console.error("Error fetching question document:", questionId, error);
     }
+
+    try {
+      const answersRef = db
+        .collection("users")
+        .doc(userId)
+        .collection("classroom")
+        .doc(subject.id)
+        .collection("checkin")
+        .doc(selectedCheckin.id)
+        .collection("answers")
+        .doc(questionId)
+        .collection("students");
+
+      console.log("EEeeee", questionId)
+
+      const snapshot = await answersRef.get();
+
+      if (!snapshot.empty) {
+        const answersData = snapshot.docs.map(doc => ({
+          studentId: doc.id,
+          text: doc.data().text || "-", // The student's answer text
+          time: doc.data().time || "-", // The timestamp of the answer
+        }));
+        setAnswers(answersData); // Store the answers in state
+
+        console.log("Ans Example", answers)
+      } else {
+        console.log("No answers found");
+        setAnswers([]); // If no answers, reset the answers state
+      }
+    } catch (error) {
+      console.error("Error fetching answers:", error);
+    }
+
   };
 
   const handleDeleteQuestion = async (questionId) => {
@@ -1183,36 +1218,37 @@ function SubjectDetail({ subject, onBack, userId }) {
     }
   };
 
-  const fetchquestionList = async (checkinId) => {
-    try {
-      const questionSnap = await db
+  const fetchStudentCounts = async () => {
+    const counts = {}; // Store fetched counts
+  
+    for (const checkin of checkinList) {
+      const studentsRef = db
         .collection("users")
         .doc(userId)
         .collection("classroom")
         .doc(subject.id)
         .collection("checkin")
-        .doc(checkinId)
-        .collection("question")
-        .get();
-
-      console.log("questionSnap", questionSnap);
-      if (questionSnap.empty) {
-        console.log("No question found");
-        setQuestionList([]);
-        setShowQuestionList(true);
-        setShowStudentsList(false);
-        setShowScoresList(false);
-        return;
+        .doc(checkin.id)
+        .collection("students");
+  
+      try {
+        const snapshot = await studentsRef.get();
+        counts[checkin.id] = snapshot.size; // Store student count
+      } catch (error) {
+        console.error("Error fetching student count:", error);
+        counts[checkin.id] = 0; // Default to 0 if there's an error
       }
-
-      const questionData = questionSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-
-      setQuestionList(questionData);
-
-    } catch (error) {
-      console.error("Error fetching question:", error);
     }
+  
+    setStudentCounts(counts); // Update state
   };
+  
+  // Run function when `checkinList` updates
+  React.useEffect(() => {
+    if (checkinList.length > 0) {
+      fetchStudentCounts();
+    }
+  }, [checkinList, userId, subject]);
 
   const fetchScoreList = async () => {
     try {
@@ -1273,41 +1309,6 @@ function SubjectDetail({ subject, onBack, userId }) {
       setScores(scoreData);
     } catch (error) {
       console.error("Error fetching score:", error);
-    }
-  };
-
-  const fetchAnswers = async () => {
-    try {
-      const answersRef = db
-        .collection("users")
-        .doc(userId)
-        .collection("classroom")
-        .doc(subject.id)
-        .collection("checkin")
-        .doc(selectedCheckin.id)
-        .collection("answers")
-        .doc(selectedQuestion.id)
-        .collection("students");
-
-      console.log("EEeeee", selectedQuestion.id)
-
-      const snapshot = await answersRef.get();
-
-      if (!snapshot.empty) {
-        const answersData = snapshot.docs.map(doc => ({
-          studentId: doc.id,
-          text: doc.data().text || "-", // The student's answer text
-          time: doc.data().time || "-", // The timestamp of the answer
-        }));
-        setAnswers(answersData); // Store the answers in state
-
-        console.log("Ans Example", answers)
-      } else {
-        console.log("No answers found");
-        setAnswers([]); // If no answers, reset the answers state
-      }
-    } catch (error) {
-      console.error("Error fetching answers:", error);
     }
   };
 
@@ -1575,62 +1576,66 @@ function SubjectDetail({ subject, onBack, userId }) {
           </Row>
 
           <Table striped bordered hover responsive>
-            <thead className="table-dark">
-              <tr>
-                <th>ลำดับ</th>
-                <th>รหัส</th>
-                <th>เวลาเช็คชื่อ</th>
-                <th>สถานะ</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {checkinList.map((checkin, index) => (
-                <tr key={checkin.id}>
-                  <td>{index + 1}</td>
-                  <td>{checkin.code}</td>
-                  <td>
-                    {checkin.date?.seconds
-                      ? new Date(checkin.date.seconds * 1000).toLocaleString(
-                        "th-TH",
-                        {
-                          day: "2-digit",
-                          month: "2-digit",
-                          year: "numeric",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                          hour12: false, // Ensure 24-hour format
-                        }
-                      )
-                      : "N/A"}
-                  </td>
-                  <td>
-                    {checkin.status === 0
-                      ? "ยังไม่เริ่ม"
-                      : checkin.status === 1
-                        ? "กำลังเช็คชื่อ"
-                        : "เสร็จแล้ว"}
-                  </td>
-                  <td>
-                    <Button
-                      variant="primary"
-                      size="sm"
-                      onClick={() => handleViewCheckin(checkin.id)}
-                    >
-                      View
-                    </Button>
-                    <Button
-                      variant="primary"
-                      size="sm"
-                      onClick={() => handleDeleteCheckin(checkin.id)}
-                    >
-                      Delete
-                    </Button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </Table>
+  <thead className="table-dark">
+    <tr>
+      <th>ลำดับ</th>
+      <th>รหัส</th>
+      <th>เวลาเช็คชื่อ</th>
+      <th>สถานะ</th>
+      <th>จำนวนนักศึกษา</th> {/* New column */}
+      <th>Actions</th>
+    </tr>
+  </thead>
+  <tbody>
+    {checkinList.map((checkin, index) => (
+      <tr key={checkin.id}>
+        <td>{index + 1}</td>
+        <td>{checkin.code}</td>
+        <td>
+          {checkin.date?.seconds
+            ? new Date(checkin.date.seconds * 1000).toLocaleString("th-TH", {
+                day: "2-digit",
+                month: "2-digit",
+                year: "numeric",
+                hour: "2-digit",
+                minute: "2-digit",
+                hour12: false,
+              })
+            : "N/A"}
+        </td>
+        <td>
+          {checkin.status === 0
+            ? "ยังไม่เริ่ม"
+            : checkin.status === 1
+            ? "กำลังเช็คชื่อ"
+            : "เสร็จแล้ว"}
+        </td>
+        <td>{studentCounts[checkin.id] ?? "Loading..."}</td> {/* Student count */}
+        <td>
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={() => {
+              handleViewCheckin(checkin.id);
+              setShowQuestionList(false);
+              setSelectedQuestion(null);
+            }}
+          >
+            View
+          </Button>
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={() => handleDeleteCheckin(checkin.id)}
+          >
+            Delete
+          </Button>
+        </td>
+      </tr>
+    ))}
+  </tbody>
+</Table>
+
         </div>
       )}
 
@@ -1749,6 +1754,7 @@ function SubjectDetail({ subject, onBack, userId }) {
                 <th>ชื่อ</th>
                 <th>หมายเหตุ</th>
                 <th>วันเวลา</th>
+                <th>มามั้ย</th>
                 <th>Actions</th>
               </tr>
             </thead>
@@ -1760,6 +1766,17 @@ function SubjectDetail({ subject, onBack, userId }) {
                   <td>{student.name || "-"}</td>
                   <td>{student.remark || "-"}</td>
                   <td>{student.date?.toDate().toLocaleString() || "-"}</td>
+                  <td>
+                    {student.date?.seconds
+                      ? (() => {
+                        const checkinTime = new Date(selectedCheckin.date.seconds * 1000);
+                        const studentTime = new Date(student.date.seconds * 1000);
+                        const diffMinutes = (studentTime - checkinTime) / (1000 * 60);
+
+                        return diffMinutes > 15 ? "สาย" : "มาตรงเวลา";
+                      })()
+                      : "-"}
+                  </td>
                   <td>
                     <Button
                       variant="danger"
@@ -2001,18 +2018,18 @@ function SubjectDetail({ subject, onBack, userId }) {
 // Component: SubjectAvatarSelector (Modal สำหรับเลือกรูปอวตารของวิชา)
 function SubjectAvatarSelector({ show, onSelect, onClose, currentAvatar }) {
   const defaultAvatars = [
-    "/web/default-subject.jpg",
-    "/web/default-subject1.jpg",
-    "/web/default-subject2.jpg",
-    "/web/default-subject3.jpg",
-    "/web/default-subject4.jpg",
-    "/web/default-subject5.jpg",
-    "/web/default-subject6.jpg",
-    "/web/default-subject7.jpg",
-    "/web/default-subject8.jpg",
-    "/web/default-subject9.jpg",
-    "/web/default-subject10.jpg",
-    "/web/default-subject11.jpg",
+    "/project_web2024/web/default-subject.jpg",
+    "/project_web2024/web/default-subject1.jpg",
+    "/project_web2024/web/default-subject2.jpg",
+    "/project_web2024/web/default-subject3.jpg",
+    "/project_web2024/web/default-subject4.jpg",
+    "/project_web2024/web/default-subject5.jpg",
+    "/project_web2024/web/default-subject6.jpg",
+    "/project_web2024/web/default-subject7.jpg",
+    "/project_web2024/web/default-subject8.jpg",
+    "/project_web2024/web/default-subject9.jpg",
+    "/project_web2024/web/default-subject10.jpg",
+    "/project_web2024/web/default-subject11.jpg",
   ];
   return (
     <Modal show={show} onHide={onClose} centered>
@@ -2300,18 +2317,18 @@ function EditProfileButton({
   };
 
   const defaultImages = [
-    "/web/default-avatar.jpg",
-    "/web/default-avatar1.jpg",
-    "/web/default-avatar2.jpg",
-    "/web/default-avatar3.jpg",
-    "/web/default-avatar4.jpg",
-    "/web/default-avatar5.jpg",
-    "/web/default-avatar6.jpg",
-    "/web/default-avatar7.jpg",
-    "/web/default-avatar8.jpg",
-    "/web/default-avatar9.jpg",
-    "/web/default-avatar10.jpg",
-    "/web/default-avatar11.jpg",
+    "/project_web2024/web/default-avatar.jpg",
+    "/project_web2024/web/default-avatar1.jpg",
+    "/project_web2024/web/default-avatar2.jpg",
+    "/project_web2024/web/default-avatar3.jpg",
+    "/project_web2024/web/default-avatar4.jpg",
+    "/project_web2024/web/default-avatar5.jpg",
+    "/project_web2024/web/default-avatar6.jpg",
+    "/project_web2024/web/default-avatar7.jpg",
+    "/project_web2024/web/default-avatar8.jpg",
+    "/project_web2024/web/default-avatar9.jpg",
+    "/project_web2024/web/default-avatar10.jpg",
+    "/project_web2024/web/default-avatar11.jpg",
   ];
 
   return (
