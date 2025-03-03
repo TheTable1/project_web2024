@@ -1243,6 +1243,46 @@ function SubjectDetail({ subject, onBack, userId }) {
     setStudentCounts(counts); // Update state
   };
 
+  const fetchquestionList = async (checkinId) => {
+    try {
+      const questionRef = db
+      .collection("users")
+        .doc(userId)
+        .collection("classroom")
+        .doc(subject.id)
+        .collection("checkin")
+        .doc(checkinId)
+        .collection("question")
+
+    const snapshot = await questionRef.get();
+
+    if (snapshot.empty){
+      console.log("No Question found.");
+      setQuestionList([]);
+      return;
+    }
+
+    const questionData = snapshot.docs.map((doc)=>({
+      id : doc.id,
+      ...doc.data(),
+    }));
+
+    setQuestionList(questionData);
+
+
+
+
+
+    }catch (error) {
+    
+    console.error("Error fetching", error);
+
+    }
+
+
+
+  };
+
   // Run function when `checkinList` updates
   React.useEffect(() => {
     if (checkinList.length > 0) {
