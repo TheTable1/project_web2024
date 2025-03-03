@@ -236,14 +236,19 @@ const HomeScreen = ({ navigation }) => {
           <Text style={styles.headerTitle}>
             สวัสดี, {userData?.name || userData?.username || "นักศึกษา"}
           </Text>
-          <Text style={styles.headerSubtitle}>ยินดีต้อนรับสู่ระบบลงทะเบียน</Text>
+          <Text style={styles.headerSubtitle}>
+            ยินดีต้อนรับสู่ระบบลงทะเบียน
+          </Text>
         </View>
         <TouchableOpacity style={styles.logoutIcon} onPress={handleLogout}>
           <MaterialIcons name="logout" size={24} color="#FF3B30" />
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.scrollView}
+        showsVerticalScrollIndicator={false}
+      >
         {/* User Info Card */}
         <View style={styles.card}>
           <View style={styles.cardHeader}>
@@ -254,9 +259,11 @@ const HomeScreen = ({ navigation }) => {
             <View style={styles.profileSection}>
               <View style={styles.avatarContainer}>
                 <Text style={styles.avatarText}>
-                  {(userData?.name?.charAt(0) ||
+                  {(
+                    userData?.name?.charAt(0) ||
                     userData?.username?.charAt(0) ||
-                    "?").toUpperCase()}
+                    "?"
+                  ).toUpperCase()}
                 </Text>
               </View>
               <View style={styles.profileInfo}>
@@ -268,6 +275,9 @@ const HomeScreen = ({ navigation }) => {
                 </Text>
                 <Text style={styles.profileDetail}>
                   อีเมล: {userData?.email || "-"}
+                </Text>
+                <Text style={styles.profileDetail}>
+                  โทรศัพท์: {userData?.phone || "-"}
                 </Text>
               </View>
             </View>
@@ -307,7 +317,10 @@ const HomeScreen = ({ navigation }) => {
               value={roomCode}
               onChangeText={setRoomCode}
             />
-            <TouchableOpacity style={styles.registerButton} onPress={handleRegisterWithCode}>
+            <TouchableOpacity
+              style={styles.registerButton}
+              onPress={handleRegisterWithCode}
+            >
               <Text style={styles.registerButtonText}>ลงทะเบียน</Text>
             </TouchableOpacity>
           </View>
@@ -325,9 +338,15 @@ const HomeScreen = ({ navigation }) => {
                 <TouchableOpacity
                   key={classItem.id}
                   style={styles.classItem}
-                  onPress={() =>
-                    navigation.navigate("DetailScreen", { classId: classItem.id })
-                  }
+                  onPress={() => {
+                    if (classItem.status === 1) {
+                      navigation.navigate("DetailScreen", {
+                        classId: classItem.id,
+                      });
+                    } else {
+                      Alert.alert("สถานะวิชา", "ต้องรอให้ อาจารย์อนุมัติก่อน");
+                    }
+                  }}
                 >
                   <View style={styles.classIconContainer}>
                     <MaterialIcons name="school" size={24} color="#3498db" />
@@ -357,8 +376,7 @@ const HomeScreen = ({ navigation }) => {
                     </Text>
                     {classItem.timestamp && (
                       <Text style={styles.timestamp}>
-                        เวลา:{" "}
-                        {new Date(classItem.timestamp).toLocaleString()}
+                        เวลา: {new Date(classItem.timestamp).toLocaleString()}
                       </Text>
                     )}
                   </View>

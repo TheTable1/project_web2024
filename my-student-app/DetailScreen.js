@@ -23,36 +23,36 @@ import {
 import { db, auth } from "./firebase";
 import { MaterialIcons } from "@expo/vector-icons";
 
-const getLocalImage = (path) => {
-  switch (path) {
-    case "/web/default-subject.jpg":
-      return require("./assets/default-subject.jpg");
-    case "/web/default-subject1.jpg":
-      return require("./assets/default-subject1.jpg");
-    case "/web/default-subject2.jpg":
-      return require("./assets/default-subject2.jpg");
-    case "/web/default-subject3.jpg":
-      return require("./assets/default-subject3.jpg");
-    case "/web/default-subject4.jpg":
-      return require("./assets/default-subject4.jpg");
-    case "/web/default-subject5.jpg":
-      return require("./assets/default-subject5.jpg");
-    case "/web/default-subject6.jpg":
-      return require("./assets/default-subject6.jpg");
-    case "/web/default-subject7.jpg":
-      return require("./assets/default-subject7.jpg");
-    case "/web/default-subject8.jpg":
-      return require("./assets/default-subject8.jpg");
-    case "/web/default-subject9.jpg":
-      return require("./assets/default-subject9.jpg");
-    case "/web/default-subject10.jpg":
-      return require("./assets/default-subject10.jpg");
-    case "/web/default-subject11.jpg":
-      return require("./assets/default-subject11.jpg");
-    default:
-      return null;
-  }
-};
+// const getLocalImage = (path) => {
+//   switch (path) {
+//     case "/project_web2024/web/default-subject.jpg":
+//       return require("./assets/default-subject.jpg");
+//     case "/project_web2024/web/default-subject1.jpg":
+//       return require("./assets/default-subject1.jpg");
+//     case "/project_web2024/web/default-subject2.jpg":
+//       return require("./assets/default-subject2.jpg");
+//     case "/project_web2024/web/default-subject3.jpg":
+//       return require("./assets/default-subject3.jpg");
+//     case "/project_web2024/web/default-subject4.jpg":
+//       return require("./assets/default-subject4.jpg");
+//     case "/project_web2024/web/default-subject5.jpg":
+//       return require("./assets/default-subject5.jpg");
+//     case "/project_web2024/web/default-subject6.jpg":
+//       return require("./assets/default-subject6.jpg");
+//     case "/project_web2024/web/default-subject7.jpg":
+//       return require("./assets/default-subject7.jpg");
+//     case "/project_web2024/web/default-subject8.jpg":
+//       return require("./assets/default-subject8.jpg");
+//     case "/project_web2024/web/default-subject9.jpg":
+//       return require("./assets/default-subject9.jpg");
+//     case "/project_web2024/web/default-subject10.jpg":
+//       return require("./assets/default-subject10.jpg");
+//     case "/project_web2024/web/default-subject11.jpg":
+//       return require("./assets/default-subject11.jpg");
+//     default:
+//       return <h1>w,j,</h1>;
+//   }
+// };
 
 const DetailScreen = ({ route, navigation }) => {
   const { classId } = route.params;
@@ -383,7 +383,7 @@ const DetailScreen = ({ route, navigation }) => {
                 <Text style={styles.value}>{ownerName}</Text>
               </View>
             )}
-            {imageSource ? (
+            {/* {imageSource ? (
               <Image
                 source={imageSource}
                 style={styles.subjectImage}
@@ -391,7 +391,7 @@ const DetailScreen = ({ route, navigation }) => {
               />
             ) : (
               <Text style={styles.noImageText}>ไม่มีรูปภาพ</Text>
-            )}
+            )} */}
           </View>
         </View>
 
