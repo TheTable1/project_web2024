@@ -1962,13 +1962,6 @@ function SubjectDetail({ subject, onBack, userId }) {
                           <Button
                             variant="danger"
                             size="sm"
-                            onClick={() => handleDeleteScore(score.id)}
-                          >
-                            Delete
-                          </Button>
-                          <Button
-                            variant="danger"
-                            size="sm"
                             onClick={() => handleEditScore(score.id)}
                           >
                             Edit
