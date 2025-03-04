@@ -2229,6 +2229,17 @@ function LoginBox({ user, app }) {
             onClick={app.google_login}
             className="px-4 py-2 fw-bold shadow-sm"
           >
+          <Button
+  variant="primary"
+  onClick={() =>
+    (window.location.href =
+      "https://expo.dev/preview/update?message=Update%20RegisterScreen.js&updateRuntimeVersion=exposdk%3A52.0.0&createdAt=2025-03-03T09%3A26%3A19.982Z&slug=exp&projectId=f6a1cf5a-2994-4f21-bcad-fe4c9ad9c7e9&group=83b41a27-8d99-4f48-812f-19e6090469fa")
+  }
+  className="px-4 py-2 fw-bold shadow-sm"
+>
+  mobile
+</Button>
+
             <i className="bi bi-google me-2"></i> Login with Google
           </Button>
         </Card>
