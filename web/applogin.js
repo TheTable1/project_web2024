@@ -2229,7 +2229,10 @@ function LoginBox({ user, app }) {
             onClick={app.google_login}
             className="px-4 py-2 fw-bold shadow-sm"
           >
-          <Button
+            <i className="bi bi-google me-2"></i> Login with Google
+          </Button>
+              
+              <Button
   variant="primary"
   onClick={() =>
     (window.location.href =
@@ -2239,9 +2242,6 @@ function LoginBox({ user, app }) {
 >
   mobile
 </Button>
-
-            <i className="bi bi-google me-2"></i> Login with Google
-          </Button>
         </Card>
       </div>
     );
